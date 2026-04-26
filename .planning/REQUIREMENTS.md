@@ -165,17 +165,100 @@ Deferred to post-soft-launch. Tracked but not in current roadmap.
 
 ## Traceability
 
-Empty initially — populated by gsd-roadmapper.
+Mapping of every v1 requirement to exactly one phase. Populated by gsd-roadmapper.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (to be populated by roadmap creation) | | |
+| INFRA-01 | Phase 1 | Pending |
+| INFRA-02 | Phase 1 | Pending |
+| INFRA-03 | Phase 1 | Pending |
+| INFRA-04 | Phase 1 | Pending |
+| INFRA-05 | Phase 1 | Pending |
+| INFRA-06 | Phase 1 | Pending |
+| API-01 | Phase 2 | Pending |
+| API-02 | Phase 2 | Pending |
+| API-03 | Phase 2 | Pending |
+| API-04 | Phase 2 | Pending |
+| API-05 | Phase 2 | Pending |
+| LEGAL-01 | Phase 3 | Pending |
+| LEGAL-02 | Phase 3 | Pending |
+| LEGAL-03 | Phase 3 | Pending |
+| LEGAL-04 | Phase 3 | Pending |
+| LEGAL-05 | Phase 3 | Pending |
+| LEAD-01 | Phase 4 | Pending |
+| LEAD-02 | Phase 4 | Pending |
+| LEAD-03 | Phase 4 | Pending |
+| LEAD-04 | Phase 4 | Pending |
+| LEAD-05 | Phase 4 | Pending |
+| LEAD-06 | Phase 4 | Pending |
+| LEAD-07 | Phase 4 | Pending |
+| LEAD-08 | Phase 4 | Pending |
+| PDF-01 | Phase 4 | Pending |
+| PDF-02 | Phase 4 | Pending |
+| PDF-03 | Phase 4 | Pending |
+| PDF-04 | Phase 4 | Pending |
+| PDF-05 | Phase 4 | Pending |
+| PDF-06 | Phase 4 | Pending |
+| MAIL-01 | Phase 4 | Pending |
+| MAIL-02 | Phase 4 | Pending |
+| MAIL-03 | Phase 4 | Pending |
+| MAIL-04 | Phase 4 | Pending |
+| MAIL-05 | Phase 4 | Pending |
+| SCRAPE-01 | Phase 5 | Pending |
+| SCRAPE-02 | Phase 5 | Pending |
+| SCRAPE-03 | Phase 5 | Pending |
+| SCRAPE-04 | Phase 5 | Pending |
+| SCRAPE-05 | Phase 5 | Pending |
+| SCRAPE-06 | Phase 5 | Pending |
+| SCRAPE-07 | Phase 5 | Pending |
+| SCRAPE-08 | Phase 5 | Pending |
+| SCRAPE-09 | Phase 5 | Pending |
+| SCRAPE-10 | Phase 5 | Pending |
+| SCRAPE-11 | Phase 5 | Pending |
+| AUTH-01 | Phase 6 | Pending |
+| AUTH-02 | Phase 6 | Pending |
+| AUTH-03 | Phase 6 | Pending |
+| AUTH-04 | Phase 6 | Pending |
+| AUTH-05 | Phase 6 | Pending |
+| ADMIN-01 | Phase 6 | Pending |
+| ADMIN-02 | Phase 6 | Pending |
+| ADMIN-03 | Phase 6 | Pending |
+| ADMIN-04 | Phase 6 | Pending |
+| ADMIN-05 | Phase 6 | Pending |
+| CONTENT-01 | Phase 7 | Pending |
+| CONTENT-02 | Phase 7 | Pending |
+| CONTENT-03 | Phase 7 | Pending |
+| CONTENT-04 | Phase 7 | Pending |
+| CONTENT-05 | Phase 7 | Pending |
+| CONTENT-06 | Phase 7 | Pending |
+| CONTENT-07 | Phase 7 | Pending |
+| CONTENT-08 | Phase 7 | Pending |
+| CONTENT-09 | Phase 7 | Pending |
+| CONTENT-10 | Phase 7 | Pending |
+| ANALYTICS-01 | Phase 7 | Pending |
+| ANALYTICS-02 | Phase 7 | Pending |
+| ANALYTICS-03 | Phase 7 | Pending |
+| LAUNCH-01 | Phase 8 | Pending |
+| LAUNCH-02 | Phase 8 | Pending |
+| LAUNCH-03 | Phase 8 | Pending |
+| LAUNCH-04 | Phase 8 | Pending |
 
 **Coverage:**
-- v1 requirements: 64 total
-- Mapped to phases: TBD (after roadmap creation)
-- Unmapped: TBD
+- v1 requirements: 73 total
+- Mapped to phases: 73 / 73 (100%)
+- Unmapped: 0
+- Doubly-mapped: 0
+
+**Per-phase requirement counts:**
+- Phase 1 (Compliance & Infra Foundation): 6
+- Phase 2 (Schema, API Skeleton & Country Registry): 5
+- Phase 3 (Frontend Integration, Consent & Legal): 5
+- Phase 4 (Lead Flow End-to-End): 19 (8 LEAD + 6 PDF + 5 MAIL)
+- Phase 5 (Inventory Pipeline): 11
+- Phase 6 (Admin Auth, RBAC & Real Admin Panel): 10 (5 AUTH + 5 ADMIN)
+- Phase 7 (Public Site Polish, Multi-Market UI & Analytics): 13 (10 CONTENT + 3 ANALYTICS)
+- Phase 8 (Pre-Launch Checklist & Soft-Launch): 4
 
 ---
 *Requirements defined: 2026-04-26*
-*Last updated: 2026-04-26 after initial definition*
+*Last updated: 2026-04-26 — traceability table populated by gsd-roadmapper (8 phases, 100% coverage)*
