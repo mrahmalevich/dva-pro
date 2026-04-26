@@ -35,7 +35,15 @@
   3. DNS-записи `dva.pro` (SPF + DKIM + DMARC) валидируются в mxtoolbox; запущен 14-дневный warm-up Unisender Go (день 1 — фаундерские ящики + базовый transactional шаблон)
   4. GitLab CI с self-hosted runner на Yandex Compute VM деплоит «hello-world» Hono image из `master` в staging и production environments
   5. GlitchTip и приватный Object Storage bucket с signed-URL-only доступом подняты; foreign SaaS observability нигде не подключён
-**Plans**: TBD
+**Plans:** 7 plans
+Plans:
+- [ ] 05-01-PLAN.md — Wave 0: Test infra bootstrap + fixtures + Phase 2 schema verification
+- [ ] 05-02-PLAN.md — Wave 1: Drizzle schemas (scraper_config/runs/brand_aliases/fx_rates) + migration + CN alias seed + [BLOCKING] schema push
+- [ ] 05-03-PLAN.md — Wave 1: Shared plumbing (http/normalize/images/block-detection/aliases/softdelete) + CBR FX feed + USS stub
+- [ ] 05-04-PLAN.md — Wave 2: drom.ru/catalog populator + Cyrillic↔Latin auto-build + worker harness with 7 pg-boss schedules + admin metrics endpoint
+- [ ] 05-05-PLAN.md — Wave 3a: Encar (Crawlee Playwright Firefox + IPRoyal KR) + Carapis fallback adapter + Day-3 D-03 checkpoint
+- [ ] 05-06-PLAN.md — Wave 3b: BeForward (Cheerio, RU DC, no proxy per D-04)
+- [ ] 05-07-PLAN.md — Wave 3c: Che168 + Autohome (Crawlee Playwright Firefox + IPRoyal CN) + D-11 May 31 cutoff checkpoint
 **Complexity:** L (calendar-bound, не код-bound)
 **Research-spike:** YES — Yandex Cloud post-2026-05-01 pricing tier confirmation; Roskomnadzor operator-identity question (какой ИНН/ОГРН какого юрлица оператор ПДн); Unisender Go warm-up calendar и шаблон transactional template
 **Parallelisable with:** Founder content collection (биографии, фото, отзывы) — pure-content track, не зависит от кода
@@ -183,7 +191,7 @@
 | 2. Schema, API Skeleton & Country Registry | 0/0 | Not started | — |
 | 3. Frontend Integration, Consent & Legal | 0/0 | Not started | — |
 | 4. Lead Flow End-to-End (Quiz → PDF → Email) | 0/0 | Not started | — |
-| 5. Inventory Pipeline (Encar + drom.ru/catalog + JP/CN scrapers) | 0/0 | Not started | — |
+| 5. Inventory Pipeline (Encar + drom.ru/catalog + JP/CN scrapers) | 0/7 | Plans created | — |
 | 6. Admin Auth, RBAC & Real Admin Panel | 0/0 | Not started | — |
 | 7. Public Site Polish, Multi-Market UI & Analytics | 0/0 | Not started | — |
 | 8. Pre-Launch Checklist & Soft-Launch | 0/0 | Not started | — |
