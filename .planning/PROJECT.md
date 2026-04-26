@@ -24,7 +24,7 @@ DVApro — авто-импортный маркетплейс для росси�
 - [ ] Квиз → PDF → email → лид-row, end-to-end, на существующих 5 вопросах (бюджет, кузов, состояние, использование, сроки)
 - [ ] Генерация брендированного PDF через @react-pdf/renderer с поддержкой кириллицы (подобранные авто + stub оценки landed-cost + контакты основателей)
 - [ ] Email-доставка PDF клиенту + копия в продажный канал
-- [ ] Inventory pipeline: расписные скрейперы для Encar (KR), USS + BeForward (JP), Che168 + Autohome (CN); все привязаны к нормализованной схеме `Car` в БД
+- [ ] Inventory pipeline: расписные скрейперы для Encar (KR), BeForward (JP), Che168 + Autohome (CN); все привязаны к нормализованной схеме `Car` в БД
 - [ ] Master DB моделей: скрейпер drom.ru/catalog → характеристики/описания/диапазоны цен для всех релевантных моделей (используется для подбора и отображения, когда конкретного объявления нет)
 - [ ] Бэкенд + БД, размещённые на российской инфраструктуре (152-ФЗ-комплаенс) — стек выбираем по итогам research-фазы
 - [ ] Админ-панель: мультипользовательский доступ (founders + sales reps) с ролями; админ редактирует cars, leads, FAQ, reviews, feed, timeline, settings, live-метрики
@@ -42,6 +42,8 @@ DVApro — авто-импортный маркетплейс для росси�
 - Реальная синхронизация с Bitrix24 — отложена в фазу после soft-launch, чтобы не блокировать запуск; до тех пор лиды живут в собственной БД и читаются админкой
 - Реальные формулы Russian customs / утилизационного сбора — отложены; в v1 — stub, чтобы не вязнуть в регуляторике до запуска
 - Скрейперы USA / UAE / Europe — не в v1; рынки заявлены публично, но техническая интеграция — следующие фазы
+- Скрейпинг USS Auctions (Япония) — партнёрский логин + ToS-блок, риск разрыва давних JP-отношений; данные USS берутся через лицензированный exporter feed (japanesecartrade / providecars / partner CSV) по необходимости, не самостоятельным скрейпером
+- Полная миграция на Next.js — отвергнута: Vercel заблокирован 152-ФЗ, re-platforming съест 1–1.5 недели без функционального выигрыша; существующий Vite SPA остаётся
 - Английская локаль — не в v1; русский — единственный язык до soft-launch
 - Customer self-service portal (трекер заказа для клиента) — после получения PDF клиент работает 1:1 с продажником; никакого личного кабинета в v1
 - Платёжная криптовалюта / нал — явно: «никаких чёрных касс и крипты» (взято из FAQ scaffold)
@@ -59,15 +61,16 @@ DVApro — авто-импортный маркетплейс для росси�
 ## Constraints
 
 - **Tech stack (frontend):** React 18 + Vite + TypeScript + react-router — уже есть, не меняем; всё новое (страницы, квиз-логика, админ) встраивается в этот скелет
-- **Tech stack (backend):** ОТКРЫТО — выбрать по итогам research-фазы; кандидаты: Node (Hono / Express / Fastify / NestJS), Python (FastAPI), полная миграция на Next.js. Должен работать на российской инфраструктуре, поддерживать scheduled jobs (для скрейперов), генерацию PDF, REST API
+- **Tech stack (backend):** Node.js 22 LTS + Hono 4.12 (`@hono/node-server`) + Drizzle ORM 0.45 + PostgreSQL 16 + pg-boss queue (BullMQ-on-Redis upgrade path) + Crawlee/Playwright 1.59 + `@react-pdf/renderer` 4.5 + Better-Auth + Yandex Object Storage (S3-совместимое). Один codebase, два процесса (api + worker)
 - **Timeline:** soft-launch 4–6 недель от старта (≈ 2026-06-07). Фазы режутся агрессивно ради этого срока
 - **Compliance:** 152-ФЗ — персональные данные граждан РФ хранятся на российских серверах
-- **Hosting:** российский провайдер (Yandex Cloud / Selectel / Timeweb / VK Cloud — выбор в research)
+- **Hosting:** Yandex Cloud `ru-central1` (managed PG, Object Storage, Compute, optional managed Redis). 152-ФЗ + FSTEC + UZ-1 посткра подтверждена в research
 - **PDF tooling:** `@react-pdf/renderer` — обязательная поддержка кириллицы и брендового стиля
 - **CRM target:** Bitrix24 (REST + webhooks) — интеграция отложена в отдельную фазу
 - **Браузерная поддержка:** последние 2 версии Chrome / Safari / Firefox / Edge на desktop + mobile; Yandex Browser — обязательно
 - **Locale:** RU only в v1
-- **Inventory data sources (v1):** Encar.com (KR), USS-Auctions + BeForward (JP), Che168 + Autohome (CN), drom.ru/catalog (master models). USA/UAE/Europe источники — не в v1
+- **Inventory data sources (v1):** Encar.com (KR), BeForward (JP), Che168 + Autohome (CN), drom.ru/catalog (master models). USS — через лицензированный exporter feed по необходимости (не скрейпер). USA/UAE/Europe источники — не в v1
+- **Email/SMTP:** Unisender Go (RU-резидентский транзакционный сервис; backups: SendPulse RU, Mailopost). DMARC + SPF + DKIM + 2-недельный warm-up отправляющего домена `dva.pro` обязательны
 
 ## Key Decisions
 
@@ -83,7 +86,9 @@ DVApro — авто-импортный маркетплейс для росси�
 | PDF генерируется через `@react-pdf/renderer` | React-стек, Cyrillic-friendly, designer-friendly; альтернатива (Puppeteer) — тяжелее в проде | — Pending |
 | Хостинг — российская инфраструктура | 152-ФЗ-комплаенс non-negotiable; конкретный провайдер выбирается в research | — Pending |
 | Auth: multi-user с ролями (founder / sales rep) | И founders, и менеджеры заходят в админку; разделение прав предотвращает админ-хаос | — Pending |
-| Backend-стек выбирается в research-фазе | Слишком большое решение, чтобы фиксировать сейчас; должны учесть scheduled jobs, PDF, российский хостинг, DX команды | — Pending |
+| Backend стек: Hono 4.12 на Node 22 + Drizzle + Postgres 16 + pg-boss + Crawlee, deploy на Yandex Cloud ru-central1 | Минимальный re-platforming surface vs существующий Vite SPA, web-standards primitives, малый image, всё необходимое для 4–6 нед запуска; Yandex Cloud — единственный провайдер с явной 152-ФЗ + FSTEC + UZ-1 постурой. Next.js миграция отвергнута (Vercel заблокирован 152-ФЗ + 1.5 нед re-platforming за 0 функционального выигрыша) | — Pending |
+| USS Auctions: НЕ скрейпим в v1 | Партнёрский логин, ToS-блок, риск permanent ban + утрата JP-партнёрства. Данные USS берутся через лицензированный exporter feed (japanesecartrade / providecars / partner CSV) когда нужно | — Pending |
+| Queue: pg-boss в v1, BullMQ как upgrade-путь | pg-boss убирает Redis из критического пути запуска; BullMQ design'ится через интерфейс для механического свопа когда scraper throughput потребует | — Pending |
 | Anti-features залочены: no e-commerce, no per-car pages, no mobile app | Защищает scope от ползучих расширений и фокусирует усилия на квиз-воронке | — Pending |
 | Bitrix24 интеграция — отдельная фаза после soft-launch | Не блокирует запуск; собственная БД — source of truth до интеграции | — Pending |
 | Существующий scaffold (Vite SPA) — основа, без редизайна | Брендинг уже на высоком уровне (тёмная тема, JetBrains Mono, --coral/--cyan); время → пайплайн, не на новый UI | — Pending |
@@ -106,4 +111,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-26 after initialization*
+*Last updated: 2026-04-26 after research synthesis (USS exclusion + backend stack lock)*
