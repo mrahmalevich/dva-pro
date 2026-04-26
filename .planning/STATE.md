@@ -1,3 +1,16 @@
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+status: Roadmap created; ready for plan-phase
+last_updated: "2026-04-26T18:53:06.592Z"
+progress:
+  total_phases: 8
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+---
+
 # Project State: DVApro
 
 **Last updated:** 2026-04-26
@@ -10,6 +23,7 @@
 **Core value:** Посетитель проходит квиз → получает на email брендированный PDF с подобранными авто и landed-cost stub → одновременно становится квалифицированным лидом в продажной воронке.
 
 **Constraints:**
+
 - Soft-launch deadline ≈ 2026-06-07 (4–6 weeks)
 - 152-ФЗ: персональные данные граждан РФ хранятся на российских серверах (Yandex Cloud `ru-central1`)
 - Frontend stack locked: React 18 + Vite + TypeScript + react-router (no Next.js migration)
@@ -17,6 +31,7 @@
 - Anti-features locked: no e-commerce checkout, no per-car detail pages, no mobile app, no real Bitrix24 sync in v1, no real customs formulas in v1, no US/AE/EU scrapers in v1, no EN locale, no foreign edge in front of forms
 
 **Linked documents:**
+
 - `.planning/PROJECT.md` — vision, requirements, decisions, anti-features
 - `.planning/REQUIREMENTS.md` — v1 requirements with traceability
 - `.planning/ROADMAP.md` — 8-phase plan with success criteria
@@ -48,6 +63,7 @@ Phase 1   2   3   4   5   6   7   8
 ## Performance Metrics
 
 **Roadmapping:**
+
 - v1 requirements identified: 73
 - Requirements mapped to phases: 73 / 73 (100% coverage)
 - Phases derived: 8 (standard granularity)
@@ -55,6 +71,7 @@ Phase 1   2   3   4   5   6   7   8
 - Parallelisable tracks identified: 5 (founder content, PDF template, scraper plumbing, admin polish, DNS warm-up)
 
 **Execution:** (will populate as phases close)
+
 - Phases completed: 0 / 8
 - Plans completed: 0 / TBD
 - Avg time per phase: TBD
@@ -98,10 +115,11 @@ Phase 1   2   3   4   5   6   7   8
 
 ## Session Continuity
 
-**Last session:** 2026-04-26 — gsd-roadmapper subagent created ROADMAP.md, STATE.md, and updated REQUIREMENTS.md traceability.
+**Last session:** 2026-04-26T18:53:06.587Z
 **Next session:** Run `/gsd-plan-phase 1` to derive plans for Phase 1 (Compliance & Infra Foundation). Phase 1 is calendar-bound (Roskomnadzor 5-day window + Unisender Go 14-day warm-up), so it must start *immediately* — code-phases 2–4 can layer on top once Phase 1 plans are defined.
 
 **Parallel work that can start in same session:**
+
 - Founder content collection (biographies, photos, reviews) — independent of code, blocks P7 launch credibility
 
 ---
