@@ -1027,27 +1027,31 @@ WHERE source_kind = $3 AND canonical_slug = $4 AND parent_brand_slug = $5
 
 **This is the canonical list of claims that should be confirmed during Day-1 of execution or surfaced to the user during `/gsd-discuss-phase` if it had time. Most are LOW risk and are recoverable in-flight.**
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Phase 2 actual `cars` / `models` columns shipped vs ARCHITECTURE.md sketch.**
    - What we know: ARCHITECTURE.md sketch documented; Phase 2 plans not yet written.
    - What's unclear: Phase 2 may ship a leaner first cut.
    - Recommendation: Phase 5 plan adds a "schema verification" Wave 0 task that diffs actual deployed schema vs expected; missing columns are added in Phase 5 migrations.
+   - RESOLVED: 05-01 Wave 0 Task 3 (`server/scripts/verify-phase2-schema.ts` reports missing cars/models columns); 05-02 Wave 1 Task 2 Step D appends `ALTER TABLE … IF NOT EXISTS` for any gaps the report flags.
 
 2. **Carapis pricing for production (USD/mo).**
    - What we know: free trial 1k requests; tier names exist (Standard/Pro/Enterprise).
    - What's unclear: actual USD prices.
    - Recommendation: Wave 1 task — sign up for Carapis trial; capture pricing matrix; document in PLAN.md before Day-3 checkpoint fires.
+   - RESOLVED: 05-06 (Encar) Task 4 Day-3 checkpoint requires Carapis sign-up if D-03 fires and writes the captured pricing tier into 05-06-SUMMARY.md.
 
 3. **Encar's actual anti-bot vendor (Cloudflare/Akamai/PerimeterX/in-house).**
    - What we know: it's commercial-grade; native IP/Korean-language detection layer; PITFALLS Pitfall 3 confirms.
    - What's unclear: which vendor specifically.
    - Recommendation: Day 1 of Encar Wave — run a single Playwright Firefox + IPRoyal KR test fetch with `nslookup` of any anti-bot CNAME visible in `Server` header. Adapt config (e.g., add `bm_sz` cookie pre-warm if Akamai is detected).
+   - RESOLVED: 05-06 (Encar) Task 2 dry-run validates Firefox + ko-KR + IPRoyal sticky session; the Day-1 header inspection lands in 05-06-SUMMARY.md "Encar's actual anti-bot vendor (if discoverable from headers)".
 
 4. **CN→Latin seed list for `brand_aliases` first batch.**
    - What we know: drom doesn't expose CN forms; manual seed needed.
    - What's unclear: which 50 brands matter most for Russian buyers (likely BYD, Geely, Haval, Chery, Great Wall, Lixiang, Nio, etc.).
    - Recommendation: Wave 1 task — founder spends 30 min listing the top 50 CN brands by RU buyer interest; researcher transliterates to seed JSON.
+   - RESOLVED: 05-02 Task 2 Step E ships `server/src/data/seed-cn-aliases.json` with the 45+ founder-anchored seed list (BYD, Geely, Haval, …, Lexus); 05-02 Task 2 Step F seeds them into `brand_aliases` via `seed-phase5.ts`.
 
 ## Environment Availability
 
