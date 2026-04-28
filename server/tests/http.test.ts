@@ -64,6 +64,26 @@ describe('shared/http.ts (D-14, A1)', () => {
     }
   }, 15_000);
 
+  it('decodes windows-1251 response body via Content-Type charset (Pitfall 2)', async () => {
+    // Encode "Лада" + "Проверка" as windows-1251 bytes
+    const iconv = await import('iconv-lite');
+    const cyrillic = '<html><head><title>Лада</title></head><body>Проверка</body></html>';
+    const win1251 = iconv.encode(cyrillic, 'windows-1251');
+    const { server, port } = await startTestServer((_req, res) => {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=windows-1251' });
+      res.end(win1251);
+    });
+    try {
+      const html = await fetchHtml(`http://127.0.0.1:${port}/`);
+      expect(html).toContain('Лада');
+      expect(html).toContain('Проверка');
+      // No replacement chars from misdecoding
+      expect(html).not.toContain('�');
+    } finally {
+      server.close();
+    }
+  }, 30_000);
+
   it('serializes via pLimit(1): two parallel fetches do not overlap', async () => {
     let inFlight = 0;
     let maxInFlight = 0;

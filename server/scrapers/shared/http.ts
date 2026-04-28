@@ -14,6 +14,7 @@
 import got from 'got';
 import { CookieJar } from 'tough-cookie';
 import pLimit from 'p-limit';
+import * as iconv from 'iconv-lite';
 
 const cookieJar = new CookieJar();
 const httpLimit = pLimit(1); // D-14: serial HTTP
@@ -54,11 +55,24 @@ export const dromClient = got.extend({
   },
 });
 
+/**
+ * Pitfall 2 fix: drom.ru serves Content-Type: text/html; charset=windows-1251.
+ * got's default text decoder assumes UTF-8 and produces mojibake on Cyrillic.
+ * Always fetch as Buffer and decode via iconv-lite using the charset advertised
+ * in the response Content-Type header. Defaults to utf-8 when no charset is given.
+ */
+function charsetFromContentType(contentType: string | undefined): string {
+  if (!contentType) return 'utf-8';
+  const match = contentType.match(/charset=([^;\s]+)/i);
+  return match ? match[1].toLowerCase() : 'utf-8';
+}
+
 export async function fetchHtml(url: string): Promise<string> {
   return httpLimit(async () => {
     await politeDelay();
-    const response = await dromClient.get(url, { responseType: 'text' });
-    return response.body;
+    const response = await dromClient.get(url, { responseType: 'buffer' });
+    const charset = charsetFromContentType(response.headers['content-type']);
+    return iconv.decode(response.body as Buffer, charset);
   });
 }
 
