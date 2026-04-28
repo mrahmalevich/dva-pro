@@ -23,10 +23,17 @@ describe('decodeCbrXml (SCRAPE-11, A8)', () => {
   });
 
   it('throws if a required currency is missing', () => {
-    // Hand-craft a windows-1251 XML missing EUR/JPY/KRW/CNY/AED — only USD present.
+    // Hand-craft a windows-1251 XML missing EUR/JPY/KRW/CNY/AED — only USD + a
+    // dummy second entry (NOK) present. The dummy is needed because
+    // fast-xml-parser collapses a single <Valute> child into an object rather
+    // than an array; with two children the array path engages and decodeCbrXml
+    // can advance past the array-shape check to the missing-currency throw.
     // Plain ASCII bytes are identical in windows-1251 and utf-8.
     const bytes = Buffer.from(
-      `<?xml version="1.0" encoding="windows-1251"?><ValCurs Date="28.04.2026"><Valute><CharCode>USD</CharCode><Nominal>1</Nominal><Value>91,3145</Value><VunitRate>91,3145</VunitRate></Valute></ValCurs>`,
+      `<?xml version="1.0" encoding="windows-1251"?><ValCurs Date="28.04.2026">` +
+        `<Valute><CharCode>USD</CharCode><Nominal>1</Nominal><Value>91,3145</Value><VunitRate>91,3145</VunitRate></Valute>` +
+        `<Valute><CharCode>NOK</CharCode><Nominal>10</Nominal><Value>8,5</Value><VunitRate>0,85</VunitRate></Valute>` +
+        `</ValCurs>`,
       'binary',
     );
     expect(() => decodeCbrXml(bytes, '2026-04-28')).toThrow(/missing currency/);
