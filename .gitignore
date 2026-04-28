@@ -5,3 +5,18 @@ dist
 .env.local
 *.log
 .vite
+# Phase 01 — runtime scrape artifacts (commit only SCHEMA.md / README.md / brand-aliases.json)
+data/scraped/**/models.json
+data/scraped/**/images/
+data/scraped/**/*.webp
+data/scraped/**/report.json
+data/scraped/**/.cursor.json
+data/scraped/**/current
+data/scraped/**/*.xml
+data/scraped/fx/cbr-*.json
+# Phase 01 — keep tracked
+!data/scraped/SCHEMA.md
+!data/scraped/README.md
+!data/scraped/drom/brand-aliases.json
+# Phase 01 — pnpm migration
+package-lock.json
