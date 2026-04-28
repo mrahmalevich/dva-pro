@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { dromClient, fetchHtml, politeDelay } from '../scrapers/shared/http.js';
+import { dromClient, fetchHtml } from '../scrapers/shared/http.js';
 
 function startTestServer(
   handler: (req: IncomingMessage, res: ServerResponse) => void,
@@ -91,45 +91,60 @@ describe('shared/http.ts (D-14, A1)', () => {
 });
 
 describe('politeDelay (D-14)', () => {
+  // Each test re-imports the module so module-scoped `lastRequestAt` is fresh
+  // and not contaminated by the dromClient tests above (which used real timers).
   beforeEach(() => {
+    vi.resetModules();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-28T07:30:00.000Z'));
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.resetModules();
   });
 
   it('first call resolves immediately (initializes lastRequestAt)', async () => {
+    const { politeDelay } = await import('../scrapers/shared/http.js');
     const promise = politeDelay();
-    // No previous call — Math.max(0, jitter - elapsed) where elapsed = Date.now() - 0
-    // is huge ⇒ wait clamped to 0. Promise resolves on next microtask.
+    // Module-scoped lastRequestAt is 0 → elapsed = Date.now() (a huge epoch ms) →
+    // wait = max(0, jitter - elapsed) = 0. Promise resolves on next microtask.
     await vi.advanceTimersByTimeAsync(0);
     await expect(promise).resolves.toBeUndefined();
   });
 
   it('second call (1s after first) waits ≥8s before resolving (10s − 20% jitter floor)', async () => {
-    // First call — establishes lastRequestAt = T0
-    const first = politeDelay();
-    await vi.advanceTimersByTimeAsync(0);
-    await first;
+    // Force Math.random() = 0.0 so jitter = base * (1 - JITTER_RATIO) = 8000 (the floor).
+    // This makes the test deterministic regardless of jitter dice rolls.
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      const { politeDelay } = await import('../scrapers/shared/http.js');
 
-    // Advance system clock by 1s — simulates a fast handler between fetches
-    vi.setSystemTime(new Date('2026-04-28T07:30:01.000Z'));
+      // First call — establishes lastRequestAt = T0
+      const first = politeDelay();
+      await vi.advanceTimersByTimeAsync(0);
+      await first;
 
-    // Second call — should NOT resolve until at least 8s of additional fake time elapses.
-    let resolved = false;
-    const second = politeDelay().then(() => {
-      resolved = true;
-    });
+      // Advance system clock by 1s — simulates a fast handler between fetches
+      await vi.advanceTimersByTimeAsync(1_000);
 
-    // Advance 6s — must still be pending (8s minimum, since 1s already elapsed → 7s remaining at floor)
-    await vi.advanceTimersByTimeAsync(6_000);
-    expect(resolved).toBe(false);
+      // Second call — should NOT resolve until at least 7s of additional fake time elapses
+      // (8s floor − 1s already elapsed = 7s remaining)
+      let resolved = false;
+      const second = politeDelay().then(() => {
+        resolved = true;
+      });
 
-    // Advance another 2s → total ≥8s elapsed since first call. Now it must resolve.
-    await vi.advanceTimersByTimeAsync(2_000);
-    await second;
-    expect(resolved).toBe(true);
+      // Advance 6s — still pending
+      await vi.advanceTimersByTimeAsync(6_000);
+      expect(resolved).toBe(false);
+
+      // Advance another 2s → total ≥8s elapsed since first call. Now it must resolve.
+      await vi.advanceTimersByTimeAsync(2_000);
+      await second;
+      expect(resolved).toBe(true);
+    } finally {
+      randomSpy.mockRestore();
+    }
   });
 });
