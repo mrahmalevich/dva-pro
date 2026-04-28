@@ -42,14 +42,14 @@
   9. Re-running the scraper twice in a row produces a consistent JSON dataset (idempotent). Diff between runs is bounded to expected drom-side changes.
   10. README at `data/scraped/README.md` (or repo top-level docs) explains how to run, where output lands, what stubs do, and how Phase 3's future importer should consume the JSON.
 **Plans:** 9 plans across 6 waves
-- [ ] 01-01-PLAN.md — pnpm migration + Node-side scaffolding (tsconfig.server.json, vitest.config.ts, .gitignore)
+- [x] 01-01-PLAN.md — pnpm migration + Node-side scaffolding (tsconfig.server.json, vitest.config.ts, .gitignore)
 - [ ] 01-02-PLAN.md — IScraper contract + 4 stubs + CLI dispatcher (SCRAPE-01..04 stub)
 - [ ] 01-03-PLAN.md — Shared HTTP (got@15) + block-detection + normalize modules
 - [ ] 01-04-PLAN.md — Image pipeline (sharp WebP) + brand-aliases idempotent merge (SCRAPE-06, SCRAPE-10)
 - [ ] 01-05-PLAN.md — CBR FX feed module (SCRAPE-11)
 - [ ] 01-06-PLAN.md — Cursor + symlink filesystem primitives (D-15, D-08)
 - [ ] 01-07-PLAN.md — Drom DOM parsers + orchestrator + integration test (SCRAPE-05, SCRAPE-09)
-- [ ] 01-08-PLAN.md — SCHEMA.md + README.md docs (Phase 3 handoff)
+- [x] 01-08-PLAN.md — SCHEMA.md + README.md docs (Phase 3 handoff)
 - [ ] 01-09-PLAN.md — Live drom smoke run gate (manual, gates Phase 1 completion)
 **Complexity:** M — narrowed scope (one real scraper + 4 stubs + shared plumbing) makes this smaller than the original Phase 5 design
 **Research-spike:** YES — drom.ru/catalog access route check (`baza.drom.ru/help/API` partner API vs polite scrape — within <1wk / <$100/mo rule); Crawlee CheerioCrawler patterns for resumable backfill; sharp WebP encoding settings for dimension preservation
