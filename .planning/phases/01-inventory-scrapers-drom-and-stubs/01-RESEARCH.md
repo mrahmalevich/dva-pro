@@ -1098,32 +1098,32 @@ export async function pointCurrentAt(runDir: string): Promise<void> {
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should `brand-aliases.json` schema include generation-level aliases or only brand+model?**
    - What we know: D-16 spec is `{brand_slug: {ru, latin, models: {model_slug: {ru, latin}}}}`. No generation level.
    - What's unclear: drom generations like «G05» (Latin) and «Г05» (would be the Cyrillic transliteration if anyone uses it — they don't; generation codes are universally Latin).
-   - Recommendation: **Stick with brand+model only.** Generations are universally Latin codes; no Cyrillic counterpart needs aliasing.
+   - RESOLVED: **Stick with brand+model only.** Generations are universally Latin codes; no Cyrillic counterpart needs aliasing.
 
 2. **What does `report.json` look like for a stub run?**
    - What we know: stubs return `{status: 'not_implemented'}` and exit 2; no `<run_id>` directory is created.
    - What's unclear: should stubs still write a stub `report.json` somewhere (e.g., `data/scraped/encar/last-attempt.json`) for observability?
-   - Recommendation: **No.** Stubs are no-ops; the only artifact is the console.warn TODO line and the exit code. Phase 3+ workers will add their own observability surfaces.
+   - RESOLVED: **No.** Stubs are no-ops; the only artifact is the console.warn TODO line and the exit code. Phase 3+ workers will add their own observability surfaces.
 
 3. **What's the policy for pruning old `<run_id>` dirs?**
    - What we know: D-08 says user prunes manually.
    - What's unclear: should `data/scraped/README.md` recommend a retention (e.g., keep last 3 successful runs)?
-   - Recommendation: **Yes, document a 3-run retention recommendation + add a `pnpm scrape:prune` script in Phase 1.x (not Phase 1 — keep scope tight).** Phase 1 just documents the manual command: `find data/scraped/drom -maxdepth 1 -name "20*Z" -mtime +30 -exec rm -rf {} +`.
+   - RESOLVED: **Yes, document a 3-run retention recommendation + add a `pnpm scrape:prune` script in Phase 1.x (not Phase 1 — keep scope tight).** Phase 1 just documents the manual command: `find data/scraped/drom -maxdepth 1 -name "20*Z" -mtime +30 -exec rm -rf {} +`.
 
 4. **Should we capture the raw HTML of every fetched drom page for debugging/replay?**
    - What we know: Phase 1 only writes `models.json` + `images/*.webp` + `report.json`.
    - What's unclear: a "raw HTML cache" (under `<run_id>/raw/<brand>/<model>.html`) would let us re-run parsers without re-fetching, but adds ~5 GB to the run.
-   - Recommendation: **Defer to Phase 1.x.** Adds complexity without a clear Phase 1 use case. If DOM regression Pitfall (Risk 1) bites, we'd want it — but the smoke run in P-22 catches that pre-Wave-2.
+   - RESOLVED: **Defer to Phase 1.x.** Adds complexity without a clear Phase 1 use case. If DOM regression Pitfall (Risk 1) bites, we'd want it — but the smoke run in P-22 catches that pre-Wave-2.
 
 5. **Does drom catalog have non-`/catalog/<brand>/<model>/` URL shapes we need to handle?**
    - What we know: WebFetch verified the canonical pattern. drom also has `/catalog/all/`, `/catalog/<brand>/all/`, `/catalog/year_<NNNN>/`, etc.
    - What's unclear: which of these are aggregator pages vs unique brand/model pages.
-   - Recommendation: **Filter strictly to `/^\/catalog\/[a-z0-9_-]+\/$/` for brand index; `/^\/catalog\/[a-z0-9_-]+\/[a-z0-9_-]+\/$/` for model list; `/g_\d{4,6}_\d+\/$/` for generation pages. Skip aggregators (`all`, year-based, etc).** Wave 1 fixture-driven dev catches edge cases.
+   - RESOLVED: **Filter strictly to `/^\/catalog\/[a-z0-9_-]+\/$/` for brand index; `/^\/catalog\/[a-z0-9_-]+\/[a-z0-9_-]+\/$/` for model list; `/g_\d{4,6}_\d+\/$/` for generation pages. Skip aggregators (`all`, year-based, etc).** Wave 1 fixture-driven dev catches edge cases.
 
 ---
 
