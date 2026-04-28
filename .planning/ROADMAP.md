@@ -48,7 +48,7 @@
 - [x] 01-04-PLAN.md — Image pipeline (sharp WebP) + brand-aliases idempotent merge (SCRAPE-06, SCRAPE-10)
 - [x] 01-05-PLAN.md — CBR FX feed module (SCRAPE-11)
 - [x] 01-06-PLAN.md — Cursor + symlink filesystem primitives (D-15, D-08)
-- [ ] 01-07-PLAN.md — Drom DOM parsers + orchestrator + integration test (SCRAPE-05, SCRAPE-09)
+- [x] 01-07-PLAN.md — Drom DOM parsers + orchestrator + integration test (SCRAPE-05, SCRAPE-09)
 - [x] 01-08-PLAN.md — SCHEMA.md + README.md docs (Phase 3 handoff)
 - [ ] 01-09-PLAN.md — Live drom smoke run gate (manual, gates Phase 1 completion)
 **Complexity:** M — narrowed scope (one real scraper + 4 stubs + shared plumbing) makes this smaller than the original Phase 5 design
