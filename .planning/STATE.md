@@ -2,14 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planning
-last_updated: "2026-04-27T11:05:00.000Z"
+status: Ready to plan
+last_updated: "2026-04-28T09:59:17.470Z"
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
-  percent: 0
 ---
 
 # Project State: DVApro
@@ -47,8 +46,8 @@ progress:
 ## Current Position
 
 **Phase:** 1 — Inventory Scrapers (drom.ru → JSON/WebP + IScraper stubs)
-**Plan:** none yet (awaiting `/gsd-discuss-phase 1`)
-**Status:** Ready to discuss
+**Plan:** none yet (context gathered 2026-04-28; awaiting `/gsd-plan-phase 1`)
+**Status:** Ready to plan
 **Progress:** 0 / 8 phases complete
 
 ```
@@ -57,7 +56,7 @@ Phase 1   2   3   4   5   6   7   8
    ░    ░   ░   ░   ░   ░   ░   ░
 ```
 
-**Next action:** `/gsd-discuss-phase 1` — gather phase context for the new (reduced-scope) Phase 1. Phase 1 produces a runnable `pnpm scrape:drom` CLI that writes structured JSON + WebP to disk; no DB, no S3, no queue. The 4 other source modules (Encar / BeForward / Che168 / Autohome) are `IScraper` interface stubs only. After discuss, run `/gsd-plan-phase 1` then `/gsd-execute-phase 1`.
+**Next action:** `/gsd-plan-phase 1` — derive plans from `01-CONTEXT.md` (committed 2026-04-28). Includes a researcher spike on `baza.drom.ru/help/API` (D-04, decision rule: <1wk + <$100/mo). After planning, `/gsd-execute-phase 1`. Phase 2 (Compliance & Infra) can run in parallel via `/gsd-discuss-phase 2`.
 
 **Parallel work that can start immediately (independent of Phase 1):**
 
@@ -101,7 +100,7 @@ Phase 1   2   3   4   5   6   7   8
 
 ### Open Questions (surface to founders before respective phase)
 
-- **Phase 1 (was Phase 5):** Output directory layout (`data/scraped/...` vs `out/...` vs `server/scraped/...`); run-id format; full drom backfill in one go vs top-N first; Crawlee vs lighter stack for drom; CBR fail-fast vs cached fallback. See `.planning/phases/01-inventory-scrapers-drom-and-stubs/01-SCOPE.md` "Anchors for the Discussion Phase".
+- **Phase 1 (was Phase 5):** ✅ Resolved 2026-04-28 via `/gsd-discuss-phase 1` — see `01-CONTEXT.md` decisions D-01..D-17. Remaining open item is the drom partner-API ToS/pricing spike (D-04), which is the researcher's first task during `/gsd-plan-phase 1`.
 - **Phase 2 (was Phase 1):** Какой ИНН/ОГРН какого юрлица оператор ПДн (DVApro ООО? founder ИП?) — affects Roskomnadzor подача и ИНН/ОГРН в footer
 - **Phase 2 (was Phase 1):** Sender-domain `dva.pro` ownership и DNS access — needed для SPF/DKIM/DMARC + warm-up
 - **Phase 2 (was Phase 1):** Yandex Cloud post-2026-05-01 pricing — re-confirm budget
@@ -124,9 +123,10 @@ Phase 1   2   3   4   5   6   7   8
 
 ## Session Continuity
 
-**Last session:** 2026-04-27 — phase reorder
+**Last session:** 2026-04-28T09:59:17.466Z
 
 **Reorder summary:**
+
 - Old Phase 5 (Inventory Pipeline — Encar + drom + JP/CN scrapers + Crawlee fleet + residential proxies + Yandex Object Storage rehost + pg-boss queue) → New Phase 1 with reduced scope (drom only + IScraper stubs, file-based output, no DB/cloud/queue)
 - Old Phase 1 (Compliance & Infra) → New Phase 2 (unchanged scope)
 - Old Phases 2–4 → New Phases 3–5 (`Depends on:` updated to new numbering; otherwise unchanged)
