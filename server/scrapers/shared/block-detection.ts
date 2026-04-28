@@ -3,15 +3,30 @@
 // Source-agnostic block-detection policy reused by every IScraper (drom in Phase 1, Encar/etc. in v1.x).
 // Per D-13 (CONTEXT.md):
 //   - 5 consecutive thin (<2KB) responses → BlockedError(reason='thin_responses')
-//   - body matches captcha keyword (капча | проверка | robot | verify, case-insensitive) → BlockedError(reason='captcha')
+//   - body matches a CAPTCHA-CHALLENGE phrase (specific multi-word patterns or
+//     widget identifiers, case-insensitive) → BlockedError(reason='captcha')
 //   - any healthy response (≥2KB, no captcha keyword) resets the thin counter
 //
-// Threat-model (T-03-02): all regexes use bounded patterns (word-level matches,
-// no nested quantifiers) — no ReDoS surface.
+// Architectural change after plan-09 live smoke (2026-04-28):
+//   The original keyword set used bare words /проверка/i, /robot/i, /verify/i
+//   which false-positive on legitimate nav copy ("Проверка по VIN" on drom's
+//   brand index, "robotics" / "verified" on countless sites). Tightened to
+//   require either a captcha-widget identifier or a specific multi-word
+//   challenge phrase. Validated against the live drom catalog response.
+//
+// Threat-model (T-03-02): bounded patterns only — fixed-width gaps `{0,40}` in
+// multi-word phrases, no nested quantifiers — no ReDoS surface.
 
 const THIN_THRESHOLD_BYTES = 2_048;
 const CONSECUTIVE_THIN_LIMIT = 5;
-const CAPTCHA_KEYWORDS: RegExp[] = [/капча/i, /проверка/i, /robot/i, /verify/i];
+const CAPTCHA_KEYWORDS: RegExp[] = [
+  /captcha/i,
+  /recaptcha|hcaptcha|cf-(challenge|turnstile)/i,
+  /капча/i,
+  /я не робот/i,
+  /подтвердите.{0,40}не робот/i,
+  /введите.{0,40}символ/i,
+];
 
 export type BlockReason = 'thin_responses' | 'captcha' | 'rate_limited' | 'http_error';
 

@@ -50,8 +50,8 @@ describe('BlockDetector — thin-response counter (D-13)', () => {
   });
 });
 
-describe('BlockDetector — captcha keyword (D-13)', () => {
-  it('throws BlockedError when body contains "капча"', () => {
+describe('BlockDetector — captcha challenge phrases (D-13, tightened post-plan-09)', () => {
+  it('throws BlockedError on the captcha fixture (matches "капча" + "не робот")', () => {
     const det = new BlockDetector();
     const captchaBody = fixture('drom/captcha-response.html');
     expect(() => det.inspect('https://drom.ru/captcha', captchaBody)).toThrow(BlockedError);
@@ -62,22 +62,55 @@ describe('BlockDetector — captcha keyword (D-13)', () => {
     }
   });
 
-  it('throws on "проверка" (case-insensitive)', () => {
+  it('throws on a body containing "captcha" (English/standard widget)', () => {
     const det = new BlockDetector();
-    const body = HEALTHY_BODY + ' Проверка безопасности';
+    const body = HEALTHY_BODY + ' <form id="captcha-form">enter the captcha</form>';
     expect(() => det.inspect('https://drom.ru/x', body)).toThrow(BlockedError);
   });
 
-  it('throws on "robot"', () => {
+  it('throws on a recaptcha widget marker', () => {
     const det = new BlockDetector();
-    const body = HEALTHY_BODY + ' Are you a robot?';
+    const body = HEALTHY_BODY + ' <div class="g-recaptcha" data-sitekey="x"></div>';
     expect(() => det.inspect('https://drom.ru/x', body)).toThrow(BlockedError);
   });
 
-  it('throws on "verify"', () => {
+  it('throws on Russian "Я не робот"', () => {
     const det = new BlockDetector();
-    const body = HEALTHY_BODY + ' Please verify';
+    const body = HEALTHY_BODY + ' <h1>Я не робот</h1>';
     expect(() => det.inspect('https://drom.ru/x', body)).toThrow(BlockedError);
+  });
+
+  it('throws on "Подтвердите, что вы не робот" (multi-word challenge)', () => {
+    const det = new BlockDetector();
+    const body = HEALTHY_BODY + ' <p>Подтвердите, что вы не робот</p>';
+    expect(() => det.inspect('https://drom.ru/x', body)).toThrow(BlockedError);
+  });
+
+  it('throws on "Введите символы с изображения" (captcha image directive)', () => {
+    const det = new BlockDetector();
+    const body = HEALTHY_BODY + ' <p>Введите символы с изображения</p>';
+    expect(() => det.inspect('https://drom.ru/x', body)).toThrow(BlockedError);
+  });
+
+  // Regression: legitimate drom nav copy that previously false-positive'd in the live smoke.
+  it('does NOT throw on legitimate drom nav "Проверка по VIN"', () => {
+    const det = new BlockDetector();
+    const body = HEALTHY_BODY + ' <a href="/vin">Проверка по VIN</a>';
+    expect(() => det.inspect('https://drom.ru/catalog/', body)).not.toThrow();
+  });
+
+  // Regression: vague "проверка" alone (no captcha context) must not block.
+  it('does NOT throw on bare "Проверка безопасности" (vague — no captcha indicator)', () => {
+    const det = new BlockDetector();
+    const body = HEALTHY_BODY + ' <p>Проверка безопасности данных</p>';
+    expect(() => det.inspect('https://drom.ru/x', body)).not.toThrow();
+  });
+
+  // Regression: bare English words without a captcha phrase must not block.
+  it('does NOT throw on bare "robot" or "verify" (too generic)', () => {
+    const det = new BlockDetector();
+    const body = HEALTHY_BODY + ' <p>Robot vacuum reviews — please verify your subscription</p>';
+    expect(() => det.inspect('https://drom.ru/x', body)).not.toThrow();
   });
 
   it('does not throw on a clean healthy body', () => {
