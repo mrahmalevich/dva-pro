@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<ValCurs Date="28.04.2026" name="Foreign Currency Market">
+  <Valute ID="R01235">
+    <NumCode>840</NumCode>
+    <CharCode>USD</CharCode>
+    <Nominal>1</Nominal>
+    <Name>Доллар США</Name>
+    <Value>91,3145</Value>
+    <VunitRate>91,3145</VunitRate>
+  </Valute>
+  <Valute ID="R01239">
+    <NumCode>978</NumCode>
+    <CharCode>EUR</CharCode>
+    <Nominal>1</Nominal>
+    <Name>Евро</Name>
+    <Value>97,5210</Value>
+    <VunitRate>97,5210</VunitRate>
+  </Valute>
+  <Valute ID="R01820">
+    <NumCode>392</NumCode>
+    <CharCode>JPY</CharCode>
+    <Nominal>100</Nominal>
+    <Name>Японских иен</Name>
+    <Value>59,1234</Value>
+    <VunitRate>0,591234</VunitRate>
+  </Valute>
+  <Valute ID="R01815">
+    <NumCode>410</NumCode>
+    <CharCode>KRW</CharCode>
+    <Nominal>1000</Nominal>
+    <Name>Вон Республики Корея</Name>
+    <Value>65,9012</Value>
+    <VunitRate>0,0659012</VunitRate>
+  </Valute>
+  <Valute ID="R01375">
+    <NumCode>156</NumCode>
+    <CharCode>CNY</CharCode>
+    <Nominal>1</Nominal>
+    <Name>Китайский юань</Name>
+    <Value>12,5670</Value>
+    <VunitRate>12,5670</VunitRate>
+  </Valute>
+  <Valute ID="R01230">
+    <NumCode>784</NumCode>
+    <CharCode>AED</CharCode>
+    <Nominal>1</Nominal>
+    <Name>Дирхам ОАЭ</Name>
+    <Value>24,8624</Value>
+    <VunitRate>24,8624</VunitRate>
+  </Valute>
+</ValCurs>
