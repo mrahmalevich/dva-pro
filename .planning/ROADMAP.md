@@ -43,7 +43,7 @@
   10. README at `data/scraped/README.md` (or repo top-level docs) explains how to run, where output lands, what stubs do, and how Phase 3's future importer should consume the JSON.
 **Plans:** 9 plans across 6 waves
 - [x] 01-01-PLAN.md — pnpm migration + Node-side scaffolding (tsconfig.server.json, vitest.config.ts, .gitignore)
-- [ ] 01-02-PLAN.md — IScraper contract + 4 stubs + CLI dispatcher (SCRAPE-01..04 stub)
+- [x] 01-02-PLAN.md — IScraper contract + 4 stubs + CLI dispatcher (SCRAPE-01..04 stub)
 - [ ] 01-03-PLAN.md — Shared HTTP (got@15) + block-detection + normalize modules
 - [ ] 01-04-PLAN.md — Image pipeline (sharp WebP) + brand-aliases idempotent merge (SCRAPE-06, SCRAPE-10)
 - [ ] 01-05-PLAN.md — CBR FX feed module (SCRAPE-11)
