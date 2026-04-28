@@ -50,7 +50,7 @@
 - [x] 01-06-PLAN.md — Cursor + symlink filesystem primitives (D-15, D-08)
 - [x] 01-07-PLAN.md — Drom DOM parsers + orchestrator + integration test (SCRAPE-05, SCRAPE-09)
 - [x] 01-08-PLAN.md — SCHEMA.md + README.md docs (Phase 3 handoff)
-- [ ] 01-09-PLAN.md — Live drom smoke run gate (manual, gates Phase 1 completion)
+- [x] 01-09-PLAN.md — Live drom smoke run gate (manual, gates Phase 1 completion)
 **Complexity:** M — narrowed scope (one real scraper + 4 stubs + shared plumbing) makes this smaller than the original Phase 5 design
 **Research-spike:** YES — drom.ru/catalog access route check (`baza.drom.ru/help/API` partner API vs polite scrape — within <1wk / <$100/mo rule); Crawlee CheerioCrawler patterns for resumable backfill; sharp WebP encoding settings for dimension preservation
 **Parallelisable with:** Phase 2 (Compliance & Infra) — no shared dependency surface; founder content collection
