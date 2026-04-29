@@ -245,6 +245,14 @@ function renderHtml(data: {
     <div class="stat"><div class="stat-label">Duration</div><div class="stat-value">${formatDuration(report.duration_ms)}</div></div>
     <div class="stat"><div class="stat-label">Started</div><div class="stat-value" style="font-size:12px">${formatDate(report.started_at)}</div></div>
     <div class="stat"><div class="stat-label">Resumed</div><div class="stat-value">${report.cursor_resumed ? 'yes' : 'no'}</div></div>
+    ${report.field_coverage ? `
+      <div class="stat"><div class="stat-label">Coverage / Identity</div><div class="stat-value">${Math.round(report.field_coverage.identity * 100)}%</div></div>
+      <div class="stat"><div class="stat-label">Coverage / Pricing</div><div class="stat-value">${Math.round(report.field_coverage.pricing * 100)}%</div></div>
+      <div class="stat"><div class="stat-label">Coverage / Drivetrain</div><div class="stat-value">${Math.round(report.field_coverage.drivetrain * 100)}%</div></div>
+      <div class="stat"><div class="stat-label">Coverage / Dimensions</div><div class="stat-value">${Math.round(report.field_coverage.dimensions * 100)}%</div></div>
+      <div class="stat"><div class="stat-label">Coverage / Comfort</div><div class="stat-value">${Math.round(report.field_coverage.comfort * 100)}%</div></div>
+      <div class="stat"><div class="stat-label">Coverage / Tires</div><div class="stat-value">${Math.round(report.field_coverage.tires * 100)}%</div></div>
+    ` : ''}
   </div>
   ${errorsBlock}
 </header>
@@ -433,6 +441,35 @@ function renderHtml(data: {
         html += '<dt>' + esc(e.label || '') + '</dt><dd>' + esc(label || '—') + '</dd>';
       }
       html += '</dl></div>';
+    }
+
+    // Phase 01.1: complectations modal section (R-8)
+    if (m.complectations && m.complectations.length > 0) {
+      html += '<div class="modal-section"><h3>Комплектации (' + m.complectations.length + ')</h3>';
+      html += '<div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px;">';
+      for (const c of m.complectations) {
+        html += '<div class="card" style="cursor: default; padding: 12px;">';
+        if (c.identity.tier) {
+          html += '<div class="brand">' + esc(c.identity.tier) + '</div>';
+        }
+        html += '<div class="model">' + esc(c.identity.name || '?') + '</div>';
+        if (c.pricing.price_new_rub !== null) {
+          html += '<div class="price-pill">' + esc(formatPrice(c.pricing.price_new_rub, null)) + '</div>';
+        }
+        html += '<dl class="kv" style="margin-top: 8px; font-size: 11px;">';
+        if (c.dimensions.length_mm !== null) {
+          html += '<dt>Длина</dt><dd>' + esc(String(c.dimensions.length_mm)) + ' мм</dd>';
+        }
+        if (c.comfort.seats !== null) {
+          html += '<dt>Места</dt><dd>' + esc(String(c.comfort.seats)) + '</dd>';
+        }
+        if (c.tires.tires_front) {
+          html += '<dt>Шины пер.</dt><dd>' + esc(c.tires.tires_front) + '</dd>';
+        }
+        html += '</dl>';
+        html += '</div>';
+      }
+      html += '</div></div>';
     }
 
     // Drive options
