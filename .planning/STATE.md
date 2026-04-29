@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-04-29T08:02:30.147Z"
+last_updated: "2026-04-29T08:39:09.164Z"
 progress:
-  total_phases: 8
+  total_phases: 9
   completed_phases: 1
   total_plans: 16
   completed_plans: 16
@@ -89,6 +89,10 @@ Phase 1   2   3   4   5   6   7   8
 ---
 
 ## Accumulated Context
+
+### Roadmap Evolution
+
+- Phase 01.1 inserted after Phase 01: extend-drom-scrape-fields: full description, complectations, engine/fuel/transmission/dimensions/tires/weight per trim (URGENT)
 
 ### Decisions Logged (from PROJECT.md + research + reorder)
 

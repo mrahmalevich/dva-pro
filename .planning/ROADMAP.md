@@ -72,6 +72,16 @@
 
 ---
 
+### Phase 01.1: extend-drom-scrape-fields (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Requirements**: TBD
+**Depends on:** Phase 01
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 01.1 to break down)
+
 ### Phase 2: Compliance & Infra Foundation
 
 **Goal:** Поднять российскую инфраструктуру и юридический фундамент так, чтобы ни одна последующая фаза не блокировалась 152-ФЗ или email-deliverability календарём.
