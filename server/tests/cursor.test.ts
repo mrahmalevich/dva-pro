@@ -142,3 +142,69 @@ describe('cursor.ts (D-15)', () => {
     expect(await readCursor(cursorPath)).toBeNull();
   });
 });
+
+describe('CursorSchema lastComplectationIndex (Phase 01.1, D-01..D-03)', () => {
+  it('forward-compat: cursor with lastComplectationIndex=12 round-trips', async () => {
+    const cursor = {
+      lastBrandSlug: 'bmw',
+      lastModelSlug: 'x5',
+      lastComplectationIndex: 12,
+      completedAt: '2026-04-29T12:00:00.000Z',
+    };
+    await writeCursor(cursorPath, cursor);
+    const read = await readCursor(cursorPath);
+    expect(read).not.toBeNull();
+    expect(read!.lastComplectationIndex).toBe(12);
+    expect(read!.lastBrandSlug).toBe('bmw');
+    expect(read!.lastModelSlug).toBe('x5');
+  });
+
+  it('backward-compat: legacy Phase-01 cursor without lastComplectationIndex parses cleanly', async () => {
+    const legacyJson = JSON.stringify({
+      lastBrandSlug: 'bmw',
+      lastModelSlug: 'x5',
+      completedAt: '2026-04-29T12:00:00.000Z',
+    });
+    await writeFile(cursorPath, legacyJson, 'utf-8');
+    const read = await readCursor(cursorPath);
+    expect(read).not.toBeNull();
+    expect(read!.lastBrandSlug).toBe('bmw');
+    // Field absent → loaded as undefined (or null if zod normalises); accept either.
+    expect(read!.lastComplectationIndex == null).toBe(true);
+  });
+
+  it('D-03 reset: cursor with lastComplectationIndex=null is accepted', async () => {
+    const cursor = {
+      lastBrandSlug: 'bmw',
+      lastModelSlug: 'x5',
+      lastComplectationIndex: null,
+      completedAt: '2026-04-29T12:00:00.000Z',
+    };
+    await writeCursor(cursorPath, cursor);
+    const read = await readCursor(cursorPath);
+    expect(read).not.toBeNull();
+    expect(read!.lastComplectationIndex).toBeNull();
+  });
+
+  it('rejects negative lastComplectationIndex (zod .min(0) constraint) → CorruptCursorError', async () => {
+    const malformed = JSON.stringify({
+      lastBrandSlug: 'bmw',
+      lastModelSlug: 'x5',
+      lastComplectationIndex: -1,
+      completedAt: '2026-04-29T12:00:00.000Z',
+    });
+    await writeFile(cursorPath, malformed, 'utf-8');
+    await expect(readCursor(cursorPath)).rejects.toThrow(CorruptCursorError);
+  });
+
+  it('rejects string lastComplectationIndex (zod .int() constraint) → CorruptCursorError', async () => {
+    const malformed = JSON.stringify({
+      lastBrandSlug: 'bmw',
+      lastModelSlug: 'x5',
+      lastComplectationIndex: 'twelve',
+      completedAt: '2026-04-29T12:00:00.000Z',
+    });
+    await writeFile(cursorPath, malformed, 'utf-8');
+    await expect(readCursor(cursorPath)).rejects.toThrow(CorruptCursorError);
+  });
+});
