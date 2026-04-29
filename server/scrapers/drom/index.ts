@@ -280,11 +280,17 @@ export const drom: IScraper = {
           a.model_slug.localeCompare(b.model_slug),
         );
 
-        // Resume: if cursor is on this brand, position at lastModelSlug
-        // (inclusive — the cursored model is included so it is re-scraped, per
-        // the CR-04 "re-scrape cursored brand" contract documented and pinned
-        // by sibling plan 01-12). Throw loudly when the cursored model is
-        // absent from the current brand (CR-02 fix per 01-REVIEW.md).
+        // Resume contract (CR-04 enforcement, plan 01-12):
+        //   When the cursor points at this brand, the brand is re-scraped from
+        //   scratch — startFromModelIndex pinned to 0 — so partial brand-alias
+        //   entries written before the mid-brand crash are reconstructed when
+        //   mergeAliases runs at the end of the brand. Records and images
+        //   from OTHER brands are preserved by inheritFromPrevCurrent above
+        //   (d3bad88), so re-scraping only the cursored brand is data-safe.
+        //
+        //   The defensive shape check below remains: if the cursor file
+        //   references a model that has vanished, surface cursor drift to the
+        //   operator even though we will be re-scraping the brand fresh.
         let startFromModelIndex = 0;
         if (cursor && brand.brand_slug === cursor.lastBrandSlug) {
           const idx = models.findIndex((m) => m.model_slug >= cursor.lastModelSlug);
@@ -295,7 +301,9 @@ export const drom: IScraper = {
                 `delete .cursor.json explicitly to start over.`,
             );
           }
-          startFromModelIndex = idx;
+          // CR-04 contract: ignore idx for positioning — re-scrape from index 0.
+          // The found-or-throw check above is preserved as a cursor-drift signal.
+          startFromModelIndex = 0;
         }
 
         for (let mi = startFromModelIndex; mi < models.length; mi++) {
