@@ -51,13 +51,25 @@ import {
 import { parseBrandIndex } from './parse-brand-index.js';
 import { parseModelList } from './parse-model-list.js';
 import { parseGenerationList } from './parse-generation-list.js';
-import { parseGenerationPage } from './parse-generation-page.js';
+import { parseGenerationPage, extractTrimRows, type TrimRowRef } from './parse-generation-page.js';
+import { computeFieldCoverage, meetsCoverageGate } from '../shared/coverage.js';
+import { parseComplectationPage } from './parse-complectation-page.js';
 
 const SOURCE = 'drom-catalog' as const;
 const BRAND_INDEX_URL = 'https://www.drom.ru/catalog/';
 // RUN_ROOT is relative; we always pass it through resolve() at runtime so the
 // integration test (which spies on process.cwd) sees the right base.
 const RUN_ROOT_REL = 'data/scraped/drom';
+
+/**
+ * SPEC R-4: per-comp deep-dive runs only for these brand slugs.
+ * Multi-brand expansion is deferred to v1.x; rate-limit posture for a 50-brand sweep
+ * is unproven and would dominate the soft-launch deadline.
+ * This filter is INDEPENDENT of the existing DROM_BRAND_WHITELIST env var (Phase 01-09);
+ * the env var gates which brands the orchestrator visits at all, this set gates which
+ * visited brands get the per-comp deep-dive.
+ */
+const BMW_PILOT_BRANDS: ReadonlySet<string> = new Set(['bmw']);
 
 /** D-07: ISO-8601 UTC compact, e.g. '2026-04-28T07-30-00Z'. */
 function makeRunId(now: Date = new Date()): string {
@@ -218,6 +230,12 @@ export const drom: IScraper = {
     // Track per-run "models touched" separately from the merged total — used
     // for the >10% Pitfall-1 validation cap below.
     let modelsTouchedThisRun = 0;
+    // Track per-comp pages fetched successfully — added to the >10% gate denominator
+    // so that per-comp parse failures (kind:'parse') do NOT trigger the generation-level
+    // DOM-regression gate. Per RESEARCH.md §Pitfall 1 inversion footnote: the gate
+    // meaningfully detects generation-level regressions only when total page count
+    // (generation + per-comp) is the denominator.
+    let complectationsFetchedThisRun = 0;
     void prevRunId; // reserved for future report.json field; suppressed for now
 
     let cursor: Cursor | null = null;
@@ -365,6 +383,111 @@ export const drom: IScraper = {
               seen.set(key, record);
               modelsTouchedThisRun++;
 
+              // ---- Phase 01.1: per-complectation deep-dive (BMW pilot only) ----
+              if (BMW_PILOT_BRANDS.has(brand.brand_slug)) {
+                // Re-use the already-loaded generation HTML for trim-row extraction.
+                let trimRows: TrimRowRef[] = [];
+                try {
+                  trimRows = extractTrimRows(genPageHtml, {
+                    brand: brand.latin_name,
+                    brand_slug: brand.brand_slug,
+                    model: model.latin_name,
+                    model_slug: model.model_slug,
+                    generation: gen.generation_id,
+                    sourceUrl: gen.url,
+                  });
+                } catch (e) {
+                  // Fail-soft: trim-row extraction failure is logged but does not abort.
+                  report.errors.push({
+                    url: gen.url,
+                    message: `parse[trim-rows]: ${e instanceof Error ? e.message : String(e)}`,
+                    kind: 'parse',
+                  });
+                  trimRows = [];
+                }
+
+                // Engine cross-walk: derive engine_cc/hp/fuel/drive for each trim row from the
+                // parent record's engine_options + drive_options. Heuristic: pick the i-th
+                // engine_option matched to the i-th trim's tbody position; default to the FIRST
+                // engine_option / drive_option when there is no positional match.
+                const enrichedTrimRows: TrimRowRef[] = trimRows.map((tr) => ({
+                  ...tr,
+                  engine_cc: tr.engine_cc ?? record.engine_options[0]?.cc ?? null,
+                  engine_hp: tr.engine_hp ?? record.engine_options[0]?.hp ?? null,
+                  engine_fuel: tr.engine_fuel ?? record.engine_options[0]?.fuel ?? null,
+                  drive: tr.drive ?? record.drive_options[0] ?? null,
+                }));
+
+                // D-01..D-03: cursor-aware start index. If the cursor identifies THIS exact
+                // (brand, model) and has a lastComplectationIndex, skip already-fetched trims.
+                const startIndex =
+                  cursor &&
+                  brand.brand_slug === cursor.lastBrandSlug &&
+                  model.model_slug === cursor.lastModelSlug &&
+                  typeof cursor.lastComplectationIndex === 'number'
+                    ? cursor.lastComplectationIndex
+                    : 0;
+
+                for (let ci = startIndex; ci < enrichedTrimRows.length; ci++) {
+                  const trimRow = enrichedTrimRows[ci];
+                  let compHtml: string;
+                  try {
+                    compHtml = await fetchHtml(trimRow.url); // probe-down limiter feeds inside (Plan 03)
+                    detector.inspect(trimRow.url, compHtml); // existing block detector — same surface as gen-page
+                    report.pages_visited++;
+                    complectationsFetchedThisRun++;
+                  } catch (fetchErr) {
+                    // Pitfall 1 inversion at orchestrator layer: per-comp fetch failure does NOT abort.
+                    // Uses kind:'orchestrator' (not 'parse') so this does NOT count toward the
+                    // generation-level 10% parse-error DOM-regression gate (RESEARCH.md §Pitfall 1
+                    // inversion footnote; must_have truth 8).
+                    report.errors.push({
+                      url: trimRow.url,
+                      message: `complectation-fetch: ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}`,
+                      kind: 'orchestrator',
+                    });
+                    // D-02: still write the cursor so a re-run skips this trim and tries the next
+                    await writeCursor(cursorPath, {
+                      lastBrandSlug: brand.brand_slug,
+                      lastModelSlug: model.model_slug,
+                      lastComplectationIndex: ci + 1,
+                      completedAt: new Date().toISOString(),
+                    });
+                    continue;
+                  }
+
+                  // parseComplectationPage NEVER throws (SPEC R-6 / Plan 05 invariant).
+                  const comp = parseComplectationPage(compHtml, {
+                    brand_slug: brand.brand_slug,
+                    model_slug: model.model_slug,
+                    comp_id: trimRow.comp_id,
+                    sourceUrl: trimRow.url,
+                    trimRow,
+                  });
+
+                  // Push per-group _extraction_errors into report.errors so the operator UX surfaces them.
+                  if (comp._extraction_errors && comp._extraction_errors.length > 0) {
+                    for (const e of comp._extraction_errors) {
+                      report.errors.push({
+                        url: trimRow.url,
+                        message: `parse[${e.group}]: ${e.message}`,
+                        kind: 'parse',
+                      });
+                    }
+                  }
+
+                  record.complectations.push(comp);
+
+                  // D-02: cursor write per trim (no throttling)
+                  await writeCursor(cursorPath, {
+                    lastBrandSlug: brand.brand_slug,
+                    lastModelSlug: model.model_slug,
+                    lastComplectationIndex: ci + 1,
+                    completedAt: new Date().toISOString(),
+                  });
+                }
+              }
+
               // 6. Hero image download (sequenced via shared/images.ts pLimit(4)).
               //    Counters split per CR-06 / WR-06:
               //      images_skipped — inherited from prev current/, OR no source URL
@@ -407,6 +530,7 @@ export const drom: IScraper = {
           await writeCursor(cursorPath, {
             lastBrandSlug: brand.brand_slug,
             lastModelSlug: model.model_slug,
+            lastComplectationIndex: null,    // D-03 reset at model boundary
             completedAt: new Date().toISOString(),
           });
         }
@@ -423,8 +547,12 @@ export const drom: IScraper = {
       // Pitfall 1 (CR-06 split): the >10% drop-out gate counts ONLY parse errors
       // (DOM-regression signal). Image-fetch errors are tracked separately
       // (images_failed) and have their own bounded threshold below.
+      // Phase 01.1: per-comp pages (complectationsFetchedThisRun) are added to the
+      // denominator so that per-comp parse failures do NOT trip the generation-level
+      // DOM-regression gate (RESEARCH.md §Pitfall 1 inversion footnote). The gate
+      // threshold (10%) and condition are otherwise unchanged.
       const parseErrors = report.errors.filter((e) => e.kind === 'parse').length;
-      const totalParseAttempted = modelsTouchedThisRun + parseErrors;
+      const totalParseAttempted = modelsTouchedThisRun + complectationsFetchedThisRun + parseErrors;
       if (totalParseAttempted > 0 && parseErrors / totalParseAttempted > 0.1) {
         throw new Error(
           `DOM regression: parse errors > 10% (${parseErrors} of ${totalParseAttempted})`,
@@ -452,9 +580,31 @@ export const drom: IScraper = {
       const finishedAt = new Date().toISOString();
       report.finished_at = finishedAt;
       report.duration_ms = Date.now() - new Date(startedAt).getTime();
-      report.final_status = 'ok';
 
       const mergedRecords = [...seen.values()];
+
+      // ---- Phase 01.1: SPEC R-7 field-coverage gate ----
+      // Only run the gate when there are complectations to evaluate (i.e. when at
+      // least one BMW-pilot record has been processed). When BMW was not in the
+      // whitelist or was not visited this run, no complectations exist and the gate
+      // must not fire — an empty pilot is NOT a coverage failure.
+      const totalComplectations = mergedRecords.reduce((n, r) => n + (r.complectations?.length ?? 0), 0);
+      if (totalComplectations > 0) {
+        const coverage = computeFieldCoverage(mergedRecords);
+        report.field_coverage = coverage;
+        if (!meetsCoverageGate(coverage)) {
+          const failing = (Object.entries(coverage) as [string, number][])
+            .filter(([_, v]) => v < 0.70)
+            .map(([k, v]) => `${k}=${v.toFixed(2)}`)
+            .join(', ');
+          throw new Error(
+            `field coverage gate failed: ${failing} (each group must be >= 0.70). ` +
+            `Full coverage: ${JSON.stringify(coverage)}`,
+          );
+        }
+      }
+
+      report.final_status = 'ok';
       await atomicWriteFile(
         resolve(runDir, 'models.json'),
         JSON.stringify(mergedRecords, null, 2),
