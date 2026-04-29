@@ -19,7 +19,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { mkdtemp, mkdir, rm, readFile, writeFile } from 'node:fs/promises';
-import { existsSync, readlinkSync } from 'node:fs';
+import { existsSync, readlinkSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { CorruptCursorError } from '../scrapers/shared/cursor.js';
@@ -29,6 +29,8 @@ const FIXTURE_MODEL_LIST = resolve('server/tests/fixtures/drom/model-list.bmw.ht
 const FIXTURE_GEN_LIST = resolve('server/tests/fixtures/drom/generation-list.bmw.x5.html');
 const FIXTURE_GEN_PAGE = resolve('server/tests/fixtures/drom/generation.bmw.x5.g05.html');
 const FIXTURE_HERO = resolve('server/tests/fixtures/images/hero.jpg');
+// Phase 01.1 per-comp fixtures — resolved at module load time (before cwd spy installs).
+const FIXTURE_COMP_207354 = resolve('server/tests/fixtures/drom/complectation/207354.html');
 
 let workDir = '';
 let cwdSpy: ReturnType<typeof vi.spyOn>;
@@ -1010,4 +1012,397 @@ describe('drom orchestrator resume path (gap-closure 01-13: CR-01..CR-04, IN-07)
     vi.doUnmock('../scrapers/shared/http.js');
     vi.doUnmock('../scrapers/shared/cursor.js');
   }, 120_000);
+});
+
+// ---------------------------------------------------------------------------
+// Phase 01.1 Plan 07: BMW pilot per-comp integration tests (R-4, R-6, R-7)
+// ---------------------------------------------------------------------------
+//
+// Strategy: use the same shared workDir, beforeAll/afterAll as the tests above.
+// Re-use existing mock helpers. Per-comp URLs are those matching
+// /catalog/bmw/<model>/<digits>/ (4 path segments under /catalog/).
+// The BMW G05 generation fixture has 33 trim rows; mocked fetchHtml routes
+// those URLs to appropriate fixture HTML.
+//
+// Key fixture constants:
+//   BMW_COMP_RICH_HTML   — server/tests/fixtures/drom/complectation/207354.html
+//                          Real BMW X5 G05 xDrive 30d AT Base fixture.
+//                          All 6 groups extractable → coverage gate passes.
+//   BMW_AUDI_GEN_HTML    — minimal HTML with no comp links (0 trim rows returned
+//                          by extractTrimRows for audi/x5 slug)
+
+describe('Phase 01.1: BMW pilot per-comp integration (R-4, R-6, R-7)', () => {
+  // Helper: neutralize block-detection keywords (same as first test in suite).
+  function neutralize(s: string): string {
+    return s
+      .replace(/Проверка по VIN/g, 'История по VIN')
+      .replace(/проверка/gi, 'осмотр')
+      .replace(/robot/gi, 'crawler')
+      .replace(/verify/gi, 'check')
+      .replace(/капча/gi, 'токен');
+  }
+
+  // Helper: clear current/ symlink between tests so each starts from a clean state.
+  async function clearCurrentAndCursor() {
+    const dromRoot = resolve(workDir, 'data/scraped/drom');
+    const currentLink = resolve(dromRoot, 'current');
+    const cursorFile = resolve(dromRoot, '.cursor.json');
+    const { unlink } = await import('node:fs/promises');
+    if (existsSync(currentLink)) await unlink(currentLink);
+    if (existsSync(cursorFile)) await unlink(cursorFile);
+  }
+
+  // R-4: BMW filter — orchestrator fetches per-comp pages ONLY for bmw,
+  // skips other brands (verifies BMW_PILOT_BRANDS.has() gate).
+  it('R-4: BMW filter — orchestrator fetches per-comp pages ONLY for bmw, skips other brands', async () => {
+    await clearCurrentAndCursor();
+
+    const heroJpeg = await readFile(FIXTURE_HERO);
+    const bmwGenHtml = neutralize(readFileSync(FIXTURE_GEN_PAGE, 'utf-8'));
+    // Minimal gen-page HTML for audi: has no comp table → extractTrimRows returns 0 rows.
+    const audiGenHtml = '<html><body><h1>Audi A6 2020</h1></body></html>';
+    const genListHtml = neutralize(readFileSync(FIXTURE_GEN_LIST, 'utf-8'));
+
+    // Track every URL that fetchHtml is called with.
+    const fetchedUrls: string[] = [];
+
+    // Two brands: bmw and audi, each with 1 model and 1 generation.
+    vi.doMock('../scrapers/drom/parse-brand-index.js', () => ({
+      parseBrandIndex: () => [
+        { brand_slug: 'audi', latin_name: 'Audi', url: 'https://www.drom.ru/catalog/audi/' },
+        { brand_slug: 'bmw', latin_name: 'BMW', url: 'https://www.drom.ru/catalog/bmw/' },
+      ],
+    }));
+    vi.doMock('../scrapers/drom/parse-model-list.js', () => ({
+      parseModelList: (_html: string, brandUrl: string) => {
+        if (brandUrl.includes('/bmw/')) {
+          return [{ model_slug: 'x5', ru_name: 'X5', latin_name: 'X5', url: `${brandUrl}x5/` }];
+        }
+        return [{ model_slug: 'a6', ru_name: 'A6', latin_name: 'A6', url: `${brandUrl}a6/` }];
+      },
+    }));
+    vi.doMock('../scrapers/drom/parse-generation-list.js', () => ({
+      parseGenerationList: (_html: string, modelUrl: string) => [
+        {
+          generation_id: 'g_201808_8395',
+          generation_label: 'G05',
+          url: `${modelUrl}g_201808_8395/`,
+          hero_image_url: 'https://s.auto.drom.ru/i24222/c/photos/generations/500x_test.jpg',
+        },
+      ],
+    }));
+    vi.doMock('../scrapers/shared/http.js', () => ({
+      fetchHtml: async (url: string) => {
+        fetchedUrls.push(url);
+        // Per-comp URLs: /catalog/<brand>/<model>/<digits>/ — 4 segments under /catalog/
+        const perCompMatch = url.match(/\/catalog\/(bmw|audi)\/[^/]+\/(\d+)\/?$/);
+        if (perCompMatch) {
+          // Do NOT return anything for per-comp pages — let them throw so we get
+          // orchestrator-kind errors. This is enough to verify R-4 (the filter).
+          throw new Error(`Stub: per-comp URL not handled in R-4 test: ${url}`);
+        }
+        // Generation pages (gen_id-shaped URLs)
+        if (/g_\d{4,6}_\d+\/?$/.test(url)) {
+          return url.includes('/audi/') ? audiGenHtml : bmwGenHtml;
+        }
+        // Brand + model list pages
+        const segs = url.replace(/^https?:\/\/www\.drom\.ru/, '').split('/').filter(Boolean);
+        if (segs[0] !== 'catalog') throw new Error(`Unexpected URL: ${url}`);
+        if (segs.length === 1) return '<html><body></body></html>'; // brand index (mocked out)
+        if (segs.length === 2) return '<html><body></body></html>'; // model list (mocked out)
+        if (segs.length === 3) return genListHtml;                   // gen list
+        throw new Error(`Unexpected URL: ${url}`);
+      },
+      fetchBuffer: async () => heroJpeg,
+      politeDelay: async () => {},
+      dromClient: { get: () => { throw new Error('dromClient should not be invoked'); } },
+    }));
+
+    vi.resetModules();
+    const { drom } = await import('../scrapers/drom/index.js');
+    const result = await drom.run({ resume: false });
+
+    // The run should complete (ok or error); what matters is URL filtering.
+    // R-4 acceptance: audi per-comp URLs were NEVER fetched.
+    const audiCompUrls = fetchedUrls.filter((u) => u.match(/\/catalog\/audi\/[^/]+\/\d+\/?$/));
+    expect(audiCompUrls).toHaveLength(0);
+
+    // BMW per-comp URLs WERE attempted (extractTrimRows returns 33 rows from G05 fixture).
+    const bmwCompUrls = fetchedUrls.filter((u) => u.match(/\/catalog\/bmw\/[^/]+\/\d+\/?$/));
+    expect(bmwCompUrls.length).toBeGreaterThanOrEqual(1);
+
+    vi.doUnmock('../scrapers/drom/parse-brand-index.js');
+    vi.doUnmock('../scrapers/drom/parse-model-list.js');
+    vi.doUnmock('../scrapers/drom/parse-generation-list.js');
+    vi.doUnmock('../scrapers/shared/http.js');
+  }, 120_000);
+
+  // R-6: per-comp fetch failures push to report.errors (kind:'orchestrator') but
+  // the run continues and final_status remains 'ok'. The per-comp fail-soft contract
+  // (SPEC R-6 / RESEARCH.md §Pitfall 1 inversion) means the 10% parse-error gate
+  // is not triggered by per-comp failures, and the coverage gate is skipped when
+  // no complectations were successfully parsed.
+  it('R-6: per-comp fetch failures push to report.errors but final_status remains ok', async () => {
+    await clearCurrentAndCursor();
+
+    const heroJpeg = await readFile(FIXTURE_HERO);
+    const bmwGenHtml = neutralize(readFileSync(FIXTURE_GEN_PAGE, 'utf-8'));
+    const genListHtml = neutralize(readFileSync(FIXTURE_GEN_LIST, 'utf-8'));
+
+    vi.doMock('../scrapers/drom/parse-brand-index.js', () => ({
+      parseBrandIndex: () => [
+        { brand_slug: 'bmw', latin_name: 'BMW', url: 'https://www.drom.ru/catalog/bmw/' },
+      ],
+    }));
+    vi.doMock('../scrapers/drom/parse-model-list.js', () => ({
+      parseModelList: (_html: string, brandUrl: string) => [
+        { model_slug: 'x5', ru_name: 'X5', latin_name: 'X5', url: `${brandUrl}x5/` },
+      ],
+    }));
+    vi.doMock('../scrapers/drom/parse-generation-list.js', () => ({
+      parseGenerationList: (_html: string, modelUrl: string) => [
+        {
+          generation_id: 'g_201808_8395',
+          generation_label: 'G05',
+          url: `${modelUrl}g_201808_8395/`,
+          hero_image_url: 'https://s.auto.drom.ru/i24222/c/photos/generations/500x_test.jpg',
+        },
+      ],
+    }));
+    vi.doMock('../scrapers/shared/http.js', () => ({
+      fetchHtml: async (url: string) => {
+        // All per-comp URLs throw a fetch error — simulating network/server failure.
+        // The orchestrator should handle this as kind:'orchestrator' and continue.
+        if (url.match(/\/catalog\/bmw\/x5\/\d+\/?$/)) {
+          throw new Error('Synthetic per-comp fetch failure');
+        }
+        if (/g_\d{4,6}_\d+\/?$/.test(url)) return bmwGenHtml;
+        const segs = url.replace(/^https?:\/\/www\.drom\.ru/, '').split('/').filter(Boolean);
+        if (segs[0] !== 'catalog') throw new Error(`Unexpected URL: ${url}`);
+        if (segs.length === 1) return '<html><body></body></html>'; // brand index
+        if (segs.length === 2) return '<html><body></body></html>'; // model list
+        if (segs.length === 3) return genListHtml;
+        throw new Error(`Unexpected URL: ${url}`);
+      },
+      fetchBuffer: async () => heroJpeg,
+      politeDelay: async () => {},
+      dromClient: { get: () => { throw new Error('dromClient should not be invoked'); } },
+    }));
+
+    vi.resetModules();
+    const { drom } = await import('../scrapers/drom/index.js');
+    const result = await drom.run({ resume: false });
+
+    // R-6 contract: per-comp failures do NOT abort the run.
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') return;
+
+    expect(result.report.final_status).toBe('ok');
+    // Errors from per-comp fetch failures are pushed as kind:'orchestrator'
+    // so they do not trip the 10% parse-error DOM-regression gate.
+    const compErrors = result.report.errors.filter(
+      (e) => e.kind === 'orchestrator' && e.message.startsWith('complectation-fetch:'),
+    );
+    expect(compErrors.length).toBeGreaterThan(0);
+
+    vi.doUnmock('../scrapers/drom/parse-brand-index.js');
+    vi.doUnmock('../scrapers/drom/parse-model-list.js');
+    vi.doUnmock('../scrapers/drom/parse-generation-list.js');
+    vi.doUnmock('../scrapers/shared/http.js');
+  }, 120_000);
+
+  // R-7 (success): report.field_coverage emitted after a BMW run that parses
+  // real per-comp HTML; meetsCoverageGate=true → final_status='ok'.
+  it('R-7: report.field_coverage emitted; meetsCoverageGate=true → final_status ok', async () => {
+    await clearCurrentAndCursor();
+
+    const heroJpeg = await readFile(FIXTURE_HERO);
+    const bmwGenHtml = neutralize(readFileSync(FIXTURE_GEN_PAGE, 'utf-8'));
+    const genListHtml = neutralize(readFileSync(FIXTURE_GEN_LIST, 'utf-8'));
+    // Real BMW X5 per-comp fixture (all 6 groups parseable → coverage ≥ 0.70).
+    // Use module-level constant resolved before cwd spy installs (avoids ENOENT in tmpdir).
+    const compRichHtml = readFileSync(FIXTURE_COMP_207354, 'utf-8');
+
+    vi.doMock('../scrapers/drom/parse-brand-index.js', () => ({
+      parseBrandIndex: () => [
+        { brand_slug: 'bmw', latin_name: 'BMW', url: 'https://www.drom.ru/catalog/bmw/' },
+      ],
+    }));
+    vi.doMock('../scrapers/drom/parse-model-list.js', () => ({
+      parseModelList: (_html: string, brandUrl: string) => [
+        { model_slug: 'x5', ru_name: 'X5', latin_name: 'X5', url: `${brandUrl}x5/` },
+      ],
+    }));
+    vi.doMock('../scrapers/drom/parse-generation-list.js', () => ({
+      parseGenerationList: (_html: string, modelUrl: string) => [
+        {
+          generation_id: 'g_201808_8395',
+          generation_label: 'G05',
+          url: `${modelUrl}g_201808_8395/`,
+          hero_image_url: 'https://s.auto.drom.ru/i24222/c/photos/generations/500x_test.jpg',
+        },
+      ],
+    }));
+    // Mock extractTrimRows to return 2 controlled trim rows with ALL pricing fields
+    // populated. Pricing data comes from trimRow context (not per-comp HTML), so without
+    // this mock the pricing coverage would reflect the actual G05 fixture trim table —
+    // many rows have null price_used_from_rub, dropping pricing coverage below 0.70.
+    vi.doMock('../scrapers/drom/parse-generation-page.js', async () => {
+      const actual = await vi.importActual<typeof import('../scrapers/drom/parse-generation-page.js')>(
+        '../scrapers/drom/parse-generation-page.js',
+      );
+      return {
+        ...actual,
+        extractTrimRows: (_html: string, ctx: any) => [
+          {
+            comp_id: '207354',
+            url: `https://www.drom.ru/catalog/${ctx.brand_slug}/${ctx.model_slug}/207354/`,
+            name: 'xDrive 30d Base',
+            period_from: '06.2018',
+            period_to: '03.2022',
+            tier: 'Базовая' as const,
+            engine_code: 'G05',
+            frame_code: null,
+            price_new_rub: 7190000,
+            price_used_from_rub: 4500000,
+            engine_cc: 2993,
+            engine_hp: 249,
+            engine_fuel: 'diesel' as const,
+            drive: '4WD',
+          },
+          {
+            comp_id: '207355',
+            url: `https://www.drom.ru/catalog/${ctx.brand_slug}/${ctx.model_slug}/207355/`,
+            name: 'xDrive 40i M Sport',
+            period_from: '06.2018',
+            period_to: '03.2022',
+            tier: 'Максимальная' as const,
+            engine_code: 'G05',
+            frame_code: null,
+            price_new_rub: 9500000,
+            price_used_from_rub: 6200000,
+            engine_cc: 2998,
+            engine_hp: 340,
+            engine_fuel: 'gas' as const,
+            drive: '4WD',
+          },
+        ],
+      };
+    });
+    vi.doMock('../scrapers/shared/http.js', () => ({
+      fetchHtml: async (url: string) => {
+        // Per-comp pages: return the real BMW X5 fixture so all groups parse successfully.
+        if (url.match(/\/catalog\/bmw\/x5\/\d+\/?$/)) return compRichHtml;
+        if (/g_\d{4,6}_\d+\/?$/.test(url)) return bmwGenHtml;
+        const segs = url.replace(/^https?:\/\/www\.drom\.ru/, '').split('/').filter(Boolean);
+        if (segs[0] !== 'catalog') throw new Error(`Unexpected URL: ${url}`);
+        if (segs.length === 1) return '<html><body></body></html>'; // brand index
+        if (segs.length === 2) return '<html><body></body></html>'; // model list
+        if (segs.length === 3) return genListHtml;
+        throw new Error(`Unexpected URL: ${url}`);
+      },
+      fetchBuffer: async () => heroJpeg,
+      politeDelay: async () => {},
+      dromClient: { get: () => { throw new Error('dromClient should not be invoked'); } },
+    }));
+
+    vi.resetModules();
+    const { drom } = await import('../scrapers/drom/index.js');
+    const result = await drom.run({ resume: false });
+
+    if (result.status === 'error') {
+      // eslint-disable-next-line no-console
+      console.error('[R-7 success] drom.run returned error:', result.error.message);
+    }
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') return;
+
+    expect(result.report.final_status).toBe('ok');
+    // R-7: field_coverage must be emitted and shaped correctly.
+    expect(result.report.field_coverage).toBeDefined();
+    expect(Object.keys(result.report.field_coverage!).sort()).toEqual(
+      ['comfort', 'dimensions', 'drivetrain', 'identity', 'pricing', 'tires'],
+    );
+    // All 6 group rates must be numbers in [0, 1].
+    for (const rate of Object.values(result.report.field_coverage!)) {
+      expect(rate).toBeGreaterThanOrEqual(0);
+      expect(rate).toBeLessThanOrEqual(1);
+    }
+    // With controlled trim rows (all pricing populated) + real 207354.html fixture,
+    // all groups must meet the 0.70 threshold (gate passes → final_status=ok).
+    for (const [group, rate] of Object.entries(result.report.field_coverage!)) {
+      expect(rate, `group '${group}' coverage`).toBeGreaterThanOrEqual(0.70);
+    }
+
+    vi.doUnmock('../scrapers/drom/parse-brand-index.js');
+    vi.doUnmock('../scrapers/drom/parse-model-list.js');
+    vi.doUnmock('../scrapers/drom/parse-generation-list.js');
+    vi.doUnmock('../scrapers/drom/parse-generation-page.js');
+    vi.doUnmock('../scrapers/shared/http.js');
+  }, 180_000);
+
+  // R-7 (gate failure): when per-comp pages return empty HTML, all groups score 0%
+  // → meetsCoverageGate=false → orchestrator throws → final_status='error'.
+  it('R-7: meetsCoverageGate=false → orchestrator throws; final_status=error with diagnostic message', async () => {
+    await clearCurrentAndCursor();
+
+    const heroJpeg = await readFile(FIXTURE_HERO);
+    const bmwGenHtml = neutralize(readFileSync(FIXTURE_GEN_PAGE, 'utf-8'));
+    const genListHtml = neutralize(readFileSync(FIXTURE_GEN_LIST, 'utf-8'));
+    // Empty per-comp body: identity still comes from trimRow context (always non-null),
+    // but dimensions/comfort/tires all-null → fails 0.70 gate on multiple groups.
+    const compEmptyHtml = '<html><body></body></html>';
+
+    vi.doMock('../scrapers/drom/parse-brand-index.js', () => ({
+      parseBrandIndex: () => [
+        { brand_slug: 'bmw', latin_name: 'BMW', url: 'https://www.drom.ru/catalog/bmw/' },
+      ],
+    }));
+    vi.doMock('../scrapers/drom/parse-model-list.js', () => ({
+      parseModelList: (_html: string, brandUrl: string) => [
+        { model_slug: 'x5', ru_name: 'X5', latin_name: 'X5', url: `${brandUrl}x5/` },
+      ],
+    }));
+    vi.doMock('../scrapers/drom/parse-generation-list.js', () => ({
+      parseGenerationList: (_html: string, modelUrl: string) => [
+        {
+          generation_id: 'g_201808_8395',
+          generation_label: 'G05',
+          url: `${modelUrl}g_201808_8395/`,
+          hero_image_url: 'https://s.auto.drom.ru/i24222/c/photos/generations/500x_test.jpg',
+        },
+      ],
+    }));
+    vi.doMock('../scrapers/shared/http.js', () => ({
+      fetchHtml: async (url: string) => {
+        // Per-comp pages: return empty HTML → all-null groups (dimensions/comfort/tires fail).
+        if (url.match(/\/catalog\/bmw\/x5\/\d+\/?$/)) return compEmptyHtml;
+        if (/g_\d{4,6}_\d+\/?$/.test(url)) return bmwGenHtml;
+        const segs = url.replace(/^https?:\/\/www\.drom\.ru/, '').split('/').filter(Boolean);
+        if (segs[0] !== 'catalog') throw new Error(`Unexpected URL: ${url}`);
+        if (segs.length === 1) return '<html><body></body></html>'; // brand index
+        if (segs.length === 2) return '<html><body></body></html>'; // model list
+        if (segs.length === 3) return genListHtml;
+        throw new Error(`Unexpected URL: ${url}`);
+      },
+      fetchBuffer: async () => heroJpeg,
+      politeDelay: async () => {},
+      dromClient: { get: () => { throw new Error('dromClient should not be invoked'); } },
+    }));
+
+    vi.resetModules();
+    const { drom } = await import('../scrapers/drom/index.js');
+    const result = await drom.run({ resume: false });
+
+    // R-7 gate failure: run must return 'error' because coverage is below 0.70.
+    expect(result.status).toBe('error');
+    if (result.status !== 'error') return;
+    // Diagnostic message names the failing groups and rates.
+    expect(result.error.message).toMatch(/coverage gate failed/i);
+
+    vi.doUnmock('../scrapers/drom/parse-brand-index.js');
+    vi.doUnmock('../scrapers/drom/parse-model-list.js');
+    vi.doUnmock('../scrapers/drom/parse-generation-list.js');
+    vi.doUnmock('../scrapers/shared/http.js');
+  }, 180_000);
 });
