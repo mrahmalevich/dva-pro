@@ -22,6 +22,7 @@ import { mkdtemp, mkdir, rm, readFile, writeFile } from 'node:fs/promises';
 import { existsSync, readlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+import { CorruptCursorError } from '../scrapers/shared/cursor.js';
 
 const FIXTURE_BRAND_INDEX = resolve('server/tests/fixtures/drom/brand-index.html');
 const FIXTURE_MODEL_LIST = resolve('server/tests/fixtures/drom/model-list.bmw.html');
@@ -561,5 +562,340 @@ describe('drom orchestrator (SCRAPE-05, SCRAPE-09 end-to-end)', () => {
     vi.doUnmock('../scrapers/drom/parse-generation-list.js');
     vi.doUnmock('../scrapers/drom/parse-generation-page.js');
     vi.doUnmock('../scrapers/shared/http.js');
+  }, 120_000);
+});
+
+describe('drom orchestrator resume path (gap-closure 01-13: CR-01..CR-04, IN-07)', () => {
+  // Helper: build the standard 3-brand fixture stubs the resume tests use.
+  // Returns `parseBrandIndex` mock factories so each test can vary brand order.
+  function makeBrandStubs(brandOrder: ReadonlyArray<{ brand_slug: string; latin_name: string }>) {
+    return {
+      parseBrandIndex: () =>
+        brandOrder.map((b) => ({
+          brand_slug: b.brand_slug,
+          latin_name: b.latin_name,
+          url: `https://www.drom.ru/catalog/${b.brand_slug}/`,
+        })),
+    };
+  }
+
+  // Helper: pre-fetch fixture buffers once per test.
+  async function loadFixtures() {
+    const heroJpeg = await readFile(FIXTURE_HERO);
+    const NEUTRALIZE = (s: string): string =>
+      s
+        .replace(/Проверка по VIN/g, 'История по VIN')
+        .replace(/проверка/gi, 'осмотр')
+        .replace(/robot/gi, 'crawler')
+        .replace(/verify/gi, 'check')
+        .replace(/капча/gi, 'токен');
+    const brandIndexHtml = NEUTRALIZE(await readFile(FIXTURE_BRAND_INDEX, 'utf-8'));
+    const modelListHtml = NEUTRALIZE(await readFile(FIXTURE_MODEL_LIST, 'utf-8'));
+    const genListHtml = NEUTRALIZE(await readFile(FIXTURE_GEN_LIST, 'utf-8'));
+    const genPageHtml = NEUTRALIZE(await readFile(FIXTURE_GEN_PAGE, 'utf-8'));
+    return { heroJpeg, brandIndexHtml, modelListHtml, genListHtml, genPageHtml };
+  }
+
+  // Helper: shared HTTP mock factory.
+  function makeHttpStub(fixtures: Awaited<ReturnType<typeof loadFixtures>>) {
+    return {
+      fetchHtml: async (url: string) => {
+        if (/g_\d{4,6}_\d+\/?$/.test(url)) return fixtures.genPageHtml;
+        const segments = url
+          .replace(/^https?:\/\/www\.drom\.ru/, '')
+          .split('/')
+          .filter(Boolean);
+        if (segments[0] !== 'catalog') throw new Error(`Unexpected URL: ${url}`);
+        if (segments.length === 1) return fixtures.brandIndexHtml;
+        if (segments.length === 2) return fixtures.modelListHtml;
+        if (segments.length === 3) return fixtures.genListHtml;
+        throw new Error(`Unexpected URL: ${url}`);
+      },
+      fetchBuffer: async (_url: string) => fixtures.heroJpeg,
+      politeDelay: async () => {},
+      dromClient: {
+        get: () => {
+          throw new Error('dromClient should not be invoked');
+        },
+      },
+    };
+  }
+
+  // Helper: clean any leftover current/ symlink between tests so each test
+  // starts from a known-empty state (no inherited records carrying over).
+  async function clearCurrent() {
+    const dromRoot = resolve(workDir, 'data/scraped/drom');
+    const currentLink = resolve(dromRoot, 'current');
+    if (existsSync(currentLink)) {
+      const { unlink } = await import('node:fs/promises');
+      await unlink(currentLink);
+    }
+  }
+
+  it('resumes from cursored brand and skips earlier brands (CR-01 fix)', async () => {
+    await clearCurrent();
+    const fixtures = await loadFixtures();
+
+    // Three brands, ALPHABETIC DOM order. Cursor points at bmw → audi must NOT
+    // be processed; bmw + lada must both have records in the new models.json.
+    vi.doMock('../scrapers/drom/parse-brand-index.js', () => ({
+      parseBrandIndex: makeBrandStubs([
+        { brand_slug: 'audi', latin_name: 'Audi' },
+        { brand_slug: 'bmw', latin_name: 'BMW' },
+        { brand_slug: 'lada', latin_name: 'Lada' },
+      ]).parseBrandIndex,
+    }));
+    vi.doMock('../scrapers/drom/parse-model-list.js', () => ({
+      parseModelList: (_html: string, brandUrl: string) => [
+        { model_slug: 'x5', ru_name: 'X5', latin_name: 'X5', url: `${brandUrl}x5/` },
+      ],
+    }));
+    vi.doMock('../scrapers/drom/parse-generation-list.js', () => ({
+      parseGenerationList: (_html: string, modelUrl: string) => [
+        {
+          generation_id: 'g_201808_8395',
+          generation_label: 'G05',
+          url: `${modelUrl}g_201808_8395/`,
+          hero_image_url: 'https://s.auto.drom.ru/i24222/c/photos/generations/500x_test.jpg',
+        },
+      ],
+    }));
+    vi.doMock('../scrapers/shared/http.js', () => makeHttpStub(fixtures));
+    // Stub readCursor to return a cursor pointing at bmw/x5.
+    vi.doMock('../scrapers/shared/cursor.js', async () => {
+      const actual = await vi.importActual<typeof import('../scrapers/shared/cursor.js')>(
+        '../scrapers/shared/cursor.js',
+      );
+      return {
+        ...actual,
+        readCursor: async () => ({
+          lastBrandSlug: 'bmw',
+          lastModelSlug: 'x5',
+          completedAt: '2026-04-28T12:00:00.000Z',
+        }),
+        writeCursor: async () => {},
+        deleteCursor: async () => {},
+      };
+    });
+
+    vi.resetModules();
+    const { drom } = await import('../scrapers/drom/index.js');
+    const result = await drom.run({ resume: true });
+
+    expect(result.status).toBe('ok');
+
+    const dromRoot = resolve(workDir, 'data/scraped/drom');
+    const modelsJson = JSON.parse(
+      await readFile(resolve(dromRoot, 'current/models.json'), 'utf-8'),
+    ) as Array<{ brand_slug: string }>;
+    const brandsInOutput = new Set(modelsJson.map((r) => r.brand_slug));
+    expect(brandsInOutput.has('bmw')).toBe(true);
+    expect(brandsInOutput.has('lada')).toBe(true);
+    expect(brandsInOutput.has('audi')).toBe(false);
+
+    const reportJson = JSON.parse(
+      await readFile(resolve(dromRoot, 'current/report.json'), 'utf-8'),
+    );
+    expect(reportJson.cursor_resumed).toBe(true);
+
+    vi.doUnmock('../scrapers/drom/parse-brand-index.js');
+    vi.doUnmock('../scrapers/drom/parse-model-list.js');
+    vi.doUnmock('../scrapers/drom/parse-generation-list.js');
+    vi.doUnmock('../scrapers/shared/http.js');
+    vi.doUnmock('../scrapers/shared/cursor.js');
+  }, 120_000);
+
+  it('sorts non-alphabetic DOM order before applying cursor (CR-03 fix)', async () => {
+    await clearCurrent();
+    const fixtures = await loadFixtures();
+
+    // Same three brands in NON-ALPHABETIC DOM order — must produce identical
+    // outcome to the previous test thanks to plan 10's sort-before-compare.
+    vi.doMock('../scrapers/drom/parse-brand-index.js', () => ({
+      parseBrandIndex: makeBrandStubs([
+        { brand_slug: 'lada', latin_name: 'Lada' },
+        { brand_slug: 'bmw', latin_name: 'BMW' },
+        { brand_slug: 'audi', latin_name: 'Audi' },
+      ]).parseBrandIndex,
+    }));
+    vi.doMock('../scrapers/drom/parse-model-list.js', () => ({
+      parseModelList: (_html: string, brandUrl: string) => [
+        { model_slug: 'x5', ru_name: 'X5', latin_name: 'X5', url: `${brandUrl}x5/` },
+      ],
+    }));
+    vi.doMock('../scrapers/drom/parse-generation-list.js', () => ({
+      parseGenerationList: (_html: string, modelUrl: string) => [
+        {
+          generation_id: 'g_201808_8395',
+          generation_label: 'G05',
+          url: `${modelUrl}g_201808_8395/`,
+          hero_image_url: 'https://s.auto.drom.ru/i24222/c/photos/generations/500x_test.jpg',
+        },
+      ],
+    }));
+    vi.doMock('../scrapers/shared/http.js', () => makeHttpStub(fixtures));
+    vi.doMock('../scrapers/shared/cursor.js', async () => {
+      const actual = await vi.importActual<typeof import('../scrapers/shared/cursor.js')>(
+        '../scrapers/shared/cursor.js',
+      );
+      return {
+        ...actual,
+        readCursor: async () => ({
+          lastBrandSlug: 'bmw',
+          lastModelSlug: 'x5',
+          completedAt: '2026-04-28T12:00:00.000Z',
+        }),
+        writeCursor: async () => {},
+        deleteCursor: async () => {},
+      };
+    });
+
+    vi.resetModules();
+    const { drom } = await import('../scrapers/drom/index.js');
+    const result = await drom.run({ resume: true });
+    expect(result.status).toBe('ok');
+
+    const dromRoot = resolve(workDir, 'data/scraped/drom');
+    const modelsJson = JSON.parse(
+      await readFile(resolve(dromRoot, 'current/models.json'), 'utf-8'),
+    ) as Array<{ brand_slug: string }>;
+    const brandsInOutput = new Set(modelsJson.map((r) => r.brand_slug));
+    // After sort, audi < bmw < lada → cursor on bmw → audi skipped.
+    expect(brandsInOutput.has('bmw')).toBe(true);
+    expect(brandsInOutput.has('lada')).toBe(true);
+    expect(brandsInOutput.has('audi')).toBe(false);
+
+    vi.doUnmock('../scrapers/drom/parse-brand-index.js');
+    vi.doUnmock('../scrapers/drom/parse-model-list.js');
+    vi.doUnmock('../scrapers/drom/parse-generation-list.js');
+    vi.doUnmock('../scrapers/shared/http.js');
+    vi.doUnmock('../scrapers/shared/cursor.js');
+  }, 120_000);
+
+  it('returns status=error when readCursor throws CorruptCursorError (WR-04 fix)', async () => {
+    await clearCurrent();
+    const fixtures = await loadFixtures();
+
+    vi.doMock('../scrapers/drom/parse-brand-index.js', () => ({
+      parseBrandIndex: makeBrandStubs([{ brand_slug: 'bmw', latin_name: 'BMW' }]).parseBrandIndex,
+    }));
+    vi.doMock('../scrapers/drom/parse-model-list.js', () => ({
+      parseModelList: () => [
+        { model_slug: 'x5', ru_name: 'X5', latin_name: 'X5', url: 'https://www.drom.ru/catalog/bmw/x5/' },
+      ],
+    }));
+    vi.doMock('../scrapers/drom/parse-generation-list.js', () => ({
+      parseGenerationList: () => [],
+    }));
+    vi.doMock('../scrapers/shared/http.js', () => makeHttpStub(fixtures));
+    // Stub readCursor to throw CorruptCursorError.
+    vi.doMock('../scrapers/shared/cursor.js', async () => {
+      const actual = await vi.importActual<typeof import('../scrapers/shared/cursor.js')>(
+        '../scrapers/shared/cursor.js',
+      );
+      return {
+        ...actual,
+        readCursor: async () => {
+          throw new CorruptCursorError('test corruption injected by 01-13 plan');
+        },
+        writeCursor: async () => {},
+        deleteCursor: async () => {},
+      };
+    });
+
+    vi.resetModules();
+    const { drom } = await import('../scrapers/drom/index.js');
+    const result = await drom.run({ resume: true });
+
+    expect(result.status).toBe('error');
+    if (result.status === 'error') {
+      expect(result.error.message).toContain('test corruption injected by 01-13 plan');
+    }
+
+    // current/ symlink must NOT be updated on error (so prior good run is preserved).
+    const dromRoot = resolve(workDir, 'data/scraped/drom');
+    expect(existsSync(resolve(dromRoot, 'current'))).toBe(false);
+
+    vi.doUnmock('../scrapers/drom/parse-brand-index.js');
+    vi.doUnmock('../scrapers/drom/parse-model-list.js');
+    vi.doUnmock('../scrapers/drom/parse-generation-list.js');
+    vi.doUnmock('../scrapers/shared/http.js');
+    vi.doUnmock('../scrapers/shared/cursor.js');
+  }, 120_000);
+
+  it('CR-04 contract: cursored brand is re-scraped from scratch (all its models present after resume)', async () => {
+    await clearCurrent();
+    const fixtures = await loadFixtures();
+
+    // Single brand bmw with two models [x3, x5]. Cursor on bmw with lastModelSlug=x3.
+    // Per CR-04 contract (plan 12): startFromModelIndex pinned to 0 → BOTH x3 AND x5
+    // re-scraped, regardless of cursor.lastModelSlug position.
+    vi.doMock('../scrapers/drom/parse-brand-index.js', () => ({
+      parseBrandIndex: makeBrandStubs([{ brand_slug: 'bmw', latin_name: 'BMW' }]).parseBrandIndex,
+    }));
+    vi.doMock('../scrapers/drom/parse-model-list.js', () => ({
+      parseModelList: () => [
+        { model_slug: 'x3', ru_name: 'X3', latin_name: 'X3', url: 'https://www.drom.ru/catalog/bmw/x3/' },
+        { model_slug: 'x5', ru_name: 'X5', latin_name: 'X5', url: 'https://www.drom.ru/catalog/bmw/x5/' },
+      ],
+    }));
+    vi.doMock('../scrapers/drom/parse-generation-list.js', () => ({
+      parseGenerationList: (_html: string, modelUrl: string) => [
+        {
+          generation_id: 'g_201808_8395',
+          generation_label: 'G05',
+          url: `${modelUrl}g_201808_8395/`,
+          hero_image_url: 'https://s.auto.drom.ru/i24222/c/photos/generations/500x_test.jpg',
+        },
+      ],
+    }));
+    vi.doMock('../scrapers/shared/http.js', () => makeHttpStub(fixtures));
+    vi.doMock('../scrapers/shared/cursor.js', async () => {
+      const actual = await vi.importActual<typeof import('../scrapers/shared/cursor.js')>(
+        '../scrapers/shared/cursor.js',
+      );
+      return {
+        ...actual,
+        // Cursor on bmw/x3 — per CR-04, BOTH x3 and x5 must be re-scraped.
+        readCursor: async () => ({
+          lastBrandSlug: 'bmw',
+          lastModelSlug: 'x3',
+          completedAt: '2026-04-28T12:00:00.000Z',
+        }),
+        writeCursor: async () => {},
+        deleteCursor: async () => {},
+      };
+    });
+
+    vi.resetModules();
+    const { drom } = await import('../scrapers/drom/index.js');
+    const result = await drom.run({ resume: true });
+
+    expect(result.status).toBe('ok');
+
+    const dromRoot = resolve(workDir, 'data/scraped/drom');
+    const modelsJson = JSON.parse(
+      await readFile(resolve(dromRoot, 'current/models.json'), 'utf-8'),
+    ) as Array<{ brand_slug: string; model_slug: string }>;
+    const keyset = new Set(modelsJson.map((r) => `${r.brand_slug}:${r.model_slug}`));
+    expect(keyset.has('bmw:x3')).toBe(true); // x3 re-scraped despite cursor pointing at it
+    expect(keyset.has('bmw:x5')).toBe(true); // x5 also scraped (the post-cursor model)
+
+    // brand-aliases: both x3 and x5 present under bmw.
+    const aliases = JSON.parse(
+      await readFile(resolve(dromRoot, 'brand-aliases.json'), 'utf-8'),
+    );
+    expect(aliases.bmw).toBeDefined();
+    // WARNING 6 fix: assert structural shape per model entry (NOT expect.any(Object)
+    // which passes for arrays / dates / null). Each model entry must be the
+    // {ru, latin} dict produced by mergeAliases.
+    expect(aliases.bmw.models.x3).toEqual({ ru: expect.any(String), latin: expect.any(String) });
+    expect(aliases.bmw.models.x5).toEqual({ ru: expect.any(String), latin: expect.any(String) });
+
+    vi.doUnmock('../scrapers/drom/parse-brand-index.js');
+    vi.doUnmock('../scrapers/drom/parse-model-list.js');
+    vi.doUnmock('../scrapers/drom/parse-generation-list.js');
+    vi.doUnmock('../scrapers/shared/http.js');
+    vi.doUnmock('../scrapers/shared/cursor.js');
   }, 120_000);
 });
