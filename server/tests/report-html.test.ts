@@ -47,7 +47,48 @@ const sampleModel: ModelRecord = {
   source: 'drom-catalog',
   source_url: 'https://www.drom.ru/catalog/bmw/x5/g_201808_8395/',
   scraped_at: '2026-04-28T12:00:00.000Z',
-  complectations: [],
+  complectations: [
+    {
+      identity: {
+        name: 'xDrive 30d AT Base',
+        period_from: '04.2020',
+        period_to: '03.2022',
+        tier: 'Базовая',
+        engine_code: 'B47B20',
+        frame_code: 'G05',
+        source_url: 'https://www.drom.ru/catalog/bmw/x5/207354/',
+      },
+      pricing: { price_new_rub: 7190000, price_used_from_rub: null },
+      drivetrain: {
+        engine_cc: 2993,
+        engine_hp: 249,
+        engine_fuel: 'diesel',
+        drive: 'AWD',
+        transmission_type: 'AT',
+        transmission_gears: 8,
+      },
+      dimensions: {
+        length_mm: 4922,
+        width_mm: 2004,
+        height_mm: 1745,
+        wheelbase_mm: 2975,
+        clearance_mm: 215,
+        trunk_min_l: 645,
+        trunk_max_l: 1860,
+        curb_weight_kg: 2140,
+        gross_weight_kg: 2760,
+      },
+      comfort: {
+        seats: 5,
+        doors: 5,
+        fuel_consumption_city_l: 8.9,
+        fuel_consumption_highway_l: 6.2,
+        fuel_consumption_combined_l: 7.2,
+        tank_l: 83,
+      },
+      tires: { tires_front: '275/45 R20 110Y', tires_rear: '275/45 R20 110Y' },
+    },
+  ],
 };
 
 const sampleReport: ReportSummary = {
@@ -66,6 +107,7 @@ const sampleReport: ReportSummary = {
   fx_stale: false,
   cursor_resumed: false,
   image_failure_rate: 0,
+  field_coverage: { identity: 0.92, pricing: 0.85, drivetrain: 0.78, dimensions: 0.74, comfort: 0.81, tires: 0.71 },
   final_status: 'ok',
 };
 
@@ -171,5 +213,30 @@ describe('writeReportHtml (plan 01-15)', () => {
     });
     const html = await readFile(resolve(fixedDir, 'index.html'), 'utf-8');
     expect(html).toMatchSnapshot();
+  });
+
+  it('renders Комплектации modal section when present (R-8)', async () => {
+    await writeReportHtml(runDir, {
+      models: [sampleModel],
+      report: sampleReport,
+    });
+    const html = await readFile(resolve(runDir, 'index.html'), 'utf-8');
+    const $ = cheerio.load(html);
+    // The complectations block is rendered as JS in the modal body script.
+    // The string "Комплектации" appears in the renderModalBody function body.
+    expect(html).toContain('Комплектации');
+    // Coverage tiles should appear in the stats grid (server-side rendered).
+    expect($('.stat-label:contains("Coverage / Identity")').length).toBe(1);
+  });
+
+  it('does NOT render coverage tiles when report.field_coverage is undefined', async () => {
+    const reportWithoutCoverage: ReportSummary = { ...sampleReport, field_coverage: undefined };
+    await writeReportHtml(runDir, {
+      models: [sampleModel],
+      report: reportWithoutCoverage,
+    });
+    const html = await readFile(resolve(runDir, 'index.html'), 'utf-8');
+    const $ = cheerio.load(html);
+    expect($('.stat-label:contains("Coverage / Identity")').length).toBe(0);
   });
 });

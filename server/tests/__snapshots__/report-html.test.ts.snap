@@ -147,6 +147,14 @@ exports[`writeReportHtml (plan 01-15) > renders a byte-stable HTML for a fixed i
     <div class="stat"><div class="stat-label">Duration</div><div class="stat-value">5m 0s</div></div>
     <div class="stat"><div class="stat-label">Started</div><div class="stat-value" style="font-size:12px">2026-04-28 12:00:00 UTC</div></div>
     <div class="stat"><div class="stat-label">Resumed</div><div class="stat-value">no</div></div>
+    
+      <div class="stat"><div class="stat-label">Coverage / Identity</div><div class="stat-value">92%</div></div>
+      <div class="stat"><div class="stat-label">Coverage / Pricing</div><div class="stat-value">85%</div></div>
+      <div class="stat"><div class="stat-label">Coverage / Drivetrain</div><div class="stat-value">78%</div></div>
+      <div class="stat"><div class="stat-label">Coverage / Dimensions</div><div class="stat-value">74%</div></div>
+      <div class="stat"><div class="stat-label">Coverage / Comfort</div><div class="stat-value">81%</div></div>
+      <div class="stat"><div class="stat-label">Coverage / Tires</div><div class="stat-value">71%</div></div>
+    
   </div>
   
 </header>
@@ -177,7 +185,7 @@ exports[`writeReportHtml (plan 01-15) > renders a byte-stable HTML for a fixed i
   <div class="modal" id="modal-content"></div>
 </div>
 
-<script type="application/json" id="data">{"models":[{"brand":"BMW","brand_slug":"bmw","model":"X5","model_slug":"x5","generation":"g_201808_8395","year_from":2018,"year_to":2022,"body_types":["SUV"],"engine_options":[{"cc":2998,"hp":340,"fuel":"gas"}],"drive_options":["AWD"],"description_ru":"Четвёртое поколение премиального кроссовера.","price_min_rub":5470000,"price_max_rub":9890000,"image_paths":["images/bmw-x5-g_201808_8395-hero.webp"],"source":"drom-catalog","source_url":"https://www.drom.ru/catalog/bmw/x5/g_201808_8395/","scraped_at":"2026-04-28T12:00:00.000Z","complectations":[]}],"runId":"fixed-snapshot-runid"}</script>
+<script type="application/json" id="data">{"models":[{"brand":"BMW","brand_slug":"bmw","model":"X5","model_slug":"x5","generation":"g_201808_8395","year_from":2018,"year_to":2022,"body_types":["SUV"],"engine_options":[{"cc":2998,"hp":340,"fuel":"gas"}],"drive_options":["AWD"],"description_ru":"Четвёртое поколение премиального кроссовера.","price_min_rub":5470000,"price_max_rub":9890000,"image_paths":["images/bmw-x5-g_201808_8395-hero.webp"],"source":"drom-catalog","source_url":"https://www.drom.ru/catalog/bmw/x5/g_201808_8395/","scraped_at":"2026-04-28T12:00:00.000Z","complectations":[{"identity":{"name":"xDrive 30d AT Base","period_from":"04.2020","period_to":"03.2022","tier":"Базовая","engine_code":"B47B20","frame_code":"G05","source_url":"https://www.drom.ru/catalog/bmw/x5/207354/"},"pricing":{"price_new_rub":7190000,"price_used_from_rub":null},"drivetrain":{"engine_cc":2993,"engine_hp":249,"engine_fuel":"diesel","drive":"AWD","transmission_type":"AT","transmission_gears":8},"dimensions":{"length_mm":4922,"width_mm":2004,"height_mm":1745,"wheelbase_mm":2975,"clearance_mm":215,"trunk_min_l":645,"trunk_max_l":1860,"curb_weight_kg":2140,"gross_weight_kg":2760},"comfort":{"seats":5,"doors":5,"fuel_consumption_city_l":8.9,"fuel_consumption_highway_l":6.2,"fuel_consumption_combined_l":7.2,"tank_l":83},"tires":{"tires_front":"275/45 R20 110Y","tires_rear":"275/45 R20 110Y"}}]}],"runId":"fixed-snapshot-runid"}</script>
 <script>
   const data = JSON.parse(document.getElementById('data').textContent);
   const models = data.models;
@@ -335,6 +343,35 @@ exports[`writeReportHtml (plan 01-15) > renders a byte-stable HTML for a fixed i
         html += '<dt>' + esc(e.label || '') + '</dt><dd>' + esc(label || '—') + '</dd>';
       }
       html += '</dl></div>';
+    }
+
+    // Phase 01.1: complectations modal section (R-8)
+    if (m.complectations && m.complectations.length > 0) {
+      html += '<div class="modal-section"><h3>Комплектации (' + m.complectations.length + ')</h3>';
+      html += '<div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px;">';
+      for (const c of m.complectations) {
+        html += '<div class="card" style="cursor: default; padding: 12px;">';
+        if (c.identity.tier) {
+          html += '<div class="brand">' + esc(c.identity.tier) + '</div>';
+        }
+        html += '<div class="model">' + esc(c.identity.name || '?') + '</div>';
+        if (c.pricing.price_new_rub !== null) {
+          html += '<div class="price-pill">' + esc(formatPrice(c.pricing.price_new_rub, null)) + '</div>';
+        }
+        html += '<dl class="kv" style="margin-top: 8px; font-size: 11px;">';
+        if (c.dimensions.length_mm !== null) {
+          html += '<dt>Длина</dt><dd>' + esc(String(c.dimensions.length_mm)) + ' мм</dd>';
+        }
+        if (c.comfort.seats !== null) {
+          html += '<dt>Места</dt><dd>' + esc(String(c.comfort.seats)) + '</dd>';
+        }
+        if (c.tires.tires_front) {
+          html += '<dt>Шины пер.</dt><dd>' + esc(c.tires.tires_front) + '</dd>';
+        }
+        html += '</dl>';
+        html += '</div>';
+      }
+      html += '</div></div>';
     }
 
     // Drive options
