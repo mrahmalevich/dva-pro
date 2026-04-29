@@ -82,12 +82,18 @@ After a successful run, `data/scraped/drom/current/` atomically points at the ne
 - `p-limit(1)` for HTTP fetches; `p-limit(4)` for sharp WebP encoding.
 - Total expected runtime for full backfill: **1–2 weeks**.
 
-### Crash recovery (D-15)
+### Crash recovery (D-15) — resume contract
 
-If the run dies mid-brand, `pnpm scrape:drom` re-launched will:
-1. Read `.cursor.json` (if present) and resume from the next model after `lastModelSlug` in brand `lastBrandSlug`.
-2. Worst case: re-fetch ≤ 1 brand's worth of pages (~7 hours wasted at 10 s/req × ~30 pages/model × ~50 models). Brand-boundary granularity is a deliberate trade-off; finer cursors are a Phase 1.x candidate.
-3. On clean completion, `.cursor.json` is deleted.
+If a `pnpm scrape:drom` run dies mid-brand, the next invocation reads `.cursor.json` and **re-scrapes the cursored brand from scratch** while preserving the prior successful run's data verbatim. The full contract:
+
+1. **Prior brands are preserved verbatim** — `inheritFromPrevCurrent` copies records and images from the previous successful `current/` snapshot into the new run dir before scraping starts. Brands that completed before the crash do NOT need to be re-fetched.
+2. **The cursored brand is re-scraped from scratch** — when the loop reaches the brand `cursor.lastBrandSlug`, `startFromModelIndex = 0`. Partial brand-aliases entries from the aborted brand are reconstructed because the brand is fully re-scraped and `mergeAliases` runs at end-of-brand on the complete set. Worst case: ~1 brand's worth of pages re-fetched (~7 hours at 10 s/req × ~30 pages/model × ~50 models for a brand-heavy entry like Toyota; smaller brands recover in minutes).
+3. **Brands lexicographically after the cursored brand are scraped fresh** — they were never reached in the aborted run.
+4. **A corrupt or hand-edited `.cursor.json` aborts the run loudly** — `readCursor` (post plan 01-11) distinguishes "file absent" (fresh start) from "file present but malformed" (`CorruptCursorError`, exit 1). Delete the file explicitly to start a fresh run after corruption.
+5. **A `cursor.lastBrandSlug` no longer present in the catalog aborts the run** — `Cursor.lastBrandSlug='X' not present in current brand list` (plan 01-10). Either re-run without `--resume` semantics (delete `.cursor.json`) or correct the brand list (e.g. unset `DROM_BRAND_WHITELIST`).
+6. **On clean completion `.cursor.json` is deleted.**
+
+The brand-boundary granularity is a deliberate Phase 1 trade-off documented in `01-REVIEW.md` (CR-04). Finer-grained cursors (per-model checkpoint persistence) are a Phase 1.x candidate; the snapshot path makes the trade-off acceptable for v1 because no records are permanently lost — only the cursored brand's pages are re-fetched.
 
 ### Incremental snapshot (UPSERT semantics)
 
