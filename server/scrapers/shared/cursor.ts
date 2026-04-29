@@ -1,6 +1,5 @@
 // server/scrapers/shared/cursor.ts
 import { readFile, unlink } from 'node:fs/promises';
-import { resolve } from 'node:path';
 import { z } from 'zod';
 import { atomicWriteFile } from './atomic-write.js';
 
@@ -10,12 +9,15 @@ import { atomicWriteFile } from './atomic-write.js';
  * Pitfall 3 trade-off (RESEARCH.md lines 818-826): brand-boundary checkpointing
  * is coarser than ideal — worst-case ~7 hours wasted on a mid-brand crash.
  * Phase 1 keeps this simple; finer-grained cursor is a Phase 1.x candidate.
- * Documented in `data/scraped/README.md` (plan 08).
  *
- * Plan 01-11 (gap-closure): readCursor now distinguishes ENOENT from corrupt
- * JSON and validates shape via zod. A hand-edited or truncated cursor file
- * throws CorruptCursorError instead of silently triggering a fresh restart
- * (WR-04 in 01-REVIEW.md).
+ * Plan 01-11 (gap-closure): readCursor distinguishes ENOENT from corrupt JSON
+ * and validates shape via zod (WR-04 fix).
+ *
+ * Plan 01-16 (gap-closure): the cursor file path is now an EXTERNAL concern.
+ * Callers (the drom orchestrator) own the path and pass it explicitly. The
+ * canonical location is `data/scraped/drom/.cursor.json` at the brand root —
+ * NOT inside per-run runDirs (which are fresh per invocation and would defeat
+ * cross-invocation resume). See data/scraped/README.md §"Crash recovery".
  */
 
 export const CursorSchema = z.object({
@@ -25,10 +27,8 @@ export const CursorSchema = z.object({
 });
 export type Cursor = z.infer<typeof CursorSchema>;
 
-const CURSOR_FILENAME = '.cursor.json';
-
 /**
- * Thrown when `.cursor.json` exists but cannot be parsed as a valid Cursor.
+ * Thrown when the cursor file exists but cannot be parsed as a valid Cursor.
  * Distinct from "file absent" (returns null) and "file unreadable for OS
  * reasons" (propagates the underlying NodeJS error). Caller should surface
  * this to the operator and refuse to start a fresh run silently.
@@ -40,8 +40,12 @@ export class CorruptCursorError extends Error {
   }
 }
 
-export async function readCursor(runDir: string): Promise<Cursor | null> {
-  const cursorPath = resolve(runDir, CURSOR_FILENAME);
+/**
+ * Read the cursor file at `cursorPath`. Returns null on ENOENT (fresh start).
+ * Throws CorruptCursorError on corrupt JSON or shape mismatch. Propagates
+ * other read errors (EACCES, etc.) unchanged.
+ */
+export async function readCursor(cursorPath: string): Promise<Cursor | null> {
   let raw: string;
   try {
     raw = await readFile(cursorPath, 'utf-8');
@@ -71,12 +75,19 @@ export async function readCursor(runDir: string): Promise<Cursor | null> {
   return result.data;
 }
 
-export async function writeCursor(runDir: string, cursor: Cursor): Promise<void> {
-  await atomicWriteFile(resolve(runDir, CURSOR_FILENAME), JSON.stringify(cursor, null, 2));
+/**
+ * Atomically write the cursor to `cursorPath`. The caller is responsible for
+ * ensuring the parent directory exists.
+ */
+export async function writeCursor(cursorPath: string, cursor: Cursor): Promise<void> {
+  await atomicWriteFile(cursorPath, JSON.stringify(cursor, null, 2));
 }
 
-export async function deleteCursor(runDir: string): Promise<void> {
-  await unlink(resolve(runDir, CURSOR_FILENAME)).catch(() => {
-    /* idempotent — no throw if absent (run completed cleanly) */
+/**
+ * Idempotently delete the cursor file. No-op on ENOENT.
+ */
+export async function deleteCursor(cursorPath: string): Promise<void> {
+  await unlink(cursorPath).catch(() => {
+    /* idempotent — no throw if absent */
   });
 }
