@@ -46,22 +46,28 @@ progress:
 
 ## Current Position
 
-Phase: 01.1 (extend-drom-scrape-fields) — EXECUTING
-Plan: 1 of 9
-**Phase:** 1 — Inventory Scrapers (drom.ru → JSON/WebP + IScraper stubs)
-**Plan:** none yet (context gathered 2026-04-28; awaiting `/gsd-plan-phase 1`)
-**Status:** Executing Phase 01.1
-**Progress:** 0 / 8 phases complete
+Phase: 01.1 (extend-drom-scrape-fields) — PAUSED at plan 09 BMW pilot manual gate
+Plan: 9 of 9 (8 plans complete; plan 09 has tasks 1-3 committed, task 4 awaits operator)
+**Status:** Paused — operator must run BMW pilot end-to-end (~5-7h, ~2000 drom requests)
 
-```
-[                                                  ] 0%
-Phase 1   2   3   4   5   6   7   8
-   ░    ░   ░   ░   ░   ░   ░   ░
-```
+**Wave summary:**
 
-**Next action:** `/gsd-plan-phase 1` — derive plans from `01-CONTEXT.md` (committed 2026-04-28). Includes a researcher spike on `baza.drom.ru/help/API` (D-04, decision rule: <1wk + <## Current Position
+- Wave 1 (4 plans): ✓ devDeps + fixtures (op), ✓ Complectation schema, ✓ ProbeDownLimiter, ✓ cursor field
+- Wave 2 (2 plans): ✓ coverage formula, ✓ fail-soft per-comp parser
+- Wave 3 (1 plan):  ✓ orchestrator wiring (BMW pilot loop, R-7 0.70 gate guarded by totalComplectations>0)
+- Wave 4 (1 plan):  ✓ HTML viewer (Комплектации section + 6 coverage tiles), bmw-pilot.test.ts snapshot
+- Wave 5 (1 plan):  ⏸ tasks 1-3 committed (puppeteer screenshot golden + SCHEMA.md + README.md); task 4 BMW pilot live run pending operator
 
-00/mo). After planning, `/gsd-execute-phase 1`. Phase 2 (Compliance & Infra) can run in parallel via `/gsd-discuss-phase 2`.
+**Test state:** 159/159 passing (19 files), typecheck clean.
+
+**To resume after BMW pilot:**
+
+1. Run `pnpm scrape:drom` (5–7h, monitor for block-detection trips). Optionally clear cursor: `rm -f data/scraped/drom/.cursor.json` first.
+2. `cat data/scraped/drom/current/report.json | jq '.field_coverage, .final_status, .pages_visited, (.errors | length)'` — every coverage rate must be ≥ 0.70, `final_status === "ok"`.
+3. Visually open `data/scraped/drom/current/index.html` — confirm "Coverage" tiles in header + "Комплектации (N)" trim cards.
+4. Re-run `/gsd-execute-phase 01.1` to resume from the checkpoint — agent will see the SUMMARY status field, ask for the six rates, finalize SUMMARY.md, run code review + verification, mark phase complete.
+
+**If pilot fails (block detection, coverage gate failure):** open `/gsd-discuss-phase 01.1 --reopen` and document the failure mode before retrying.
 
 **Parallel work that can start immediately (independent of Phase 1):**
 
