@@ -86,7 +86,7 @@
   6. Run completes with `final_status: 'ok'` even when individual per-comp pages have missing or broken sections — the per-comp parser is fail-soft (`safeParse`, never throws); failures emit `_extraction_errors[]` annotation (R-6)
   7. `bmw-pilot.test.ts` snapshot locks per-field-group coverage (six rates rounded to 2 dp); CI fails on snapshot mismatch (R-8)
   8. `bmw-pilot-viewer.png` screenshot golden locks HTML viewer rendering of complectation fields via puppeteer + pixelmatch + pngjs (devDep-only); CI fails on > 0.5 % image diff (R-8)
-**Plans:** 7/9 plans executed
+**Plans:** 8/9 plans executed
 - [x] 01.1-01-PLAN.md — Wave 0: pnpm add -D puppeteer + pixelmatch + pngjs + @types/*; --capture-fixture CLI; capture 3 live + 2 hand-edited BMW fixtures (checkpoint:human-verify)
 - [x] 01.1-02-PLAN.md — Wave 1: Complectation zod sub-schema + ModelRecord.complectations + ReportSummary.field_coverage + complectation-schema.test.ts (R-2, R-3)
 - [x] 01.1-03-PLAN.md — Wave 1: ProbeDownLimiter pure module + http.ts wiring + rate-limiter.test.ts (R-5)
@@ -94,7 +94,7 @@
 - [x] 01.1-05-PLAN.md — Wave 2: parseComplectationPage fail-soft + extractTrimRows + parse-complectation-page.test.ts (R-1, R-3, R-6)
 - [x] 01.1-06-PLAN.md — Wave 1: cursor.ts gains lastComplectationIndex (D-01..D-04) + cursor.test.ts forward+backward-compat
 - [x] 01.1-07-PLAN.md — Wave 3: drom/index.ts BMW filter + per-comp loop + engine cross-walk + per-trim cursor + coverage emit + drom-integration.test.ts (R-4, R-6, R-7)
-- [ ] 01.1-08-PLAN.md — Wave 4: report-html.ts Комплектации section + Coverage tiles + bmw-pilot.test.ts snapshot golden (R-8 snapshot half)
+- [x] 01.1-08-PLAN.md — Wave 4: report-html.ts Комплектации section + Coverage tiles + bmw-pilot.test.ts snapshot golden (R-8 snapshot half)
 - [ ] 01.1-09-PLAN.md — Wave 5: bmw-pilot-viewer.test.ts puppeteer+pixelmatch screenshot golden + SCHEMA.md/README.md docs + manual BMW pilot run gate (R-8 PNG half + R-2/R-4/R-7 manual end-to-end)
 **Complexity:** M — pure extension of an in-flight scraper; every new module mirrors a Phase 01 analog (RESEARCH.md confidence HIGH)
 **Research-spike:** Researched 2026-04-29 (`01.1-RESEARCH.md`); HIGH confidence; live-verified DOM against `/catalog/bmw/x5/207354/`; standard stack locked: puppeteer 24.42 + pixelmatch 7.2 + pngjs 7.0 (devDeps for one screenshot test)
@@ -246,7 +246,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Inventory Scrapers (drom + stubs, JSON/WebP) | 16/16 | Complete | 2026-04-29 |
-| 01.1. extend-drom-scrape-fields | 7/9 | In Progress|  |
+| 01.1. extend-drom-scrape-fields | 8/9 | In Progress|  |
 | 2. Compliance & Infra Foundation | 0/0 | Not started | — |
 | 3. Schema, API Skeleton & Country Registry | 0/0 | Not started | — |
 | 4. Frontend Integration, Consent & Legal | 0/0 | Not started | — |
