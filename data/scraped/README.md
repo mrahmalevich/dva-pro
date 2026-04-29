@@ -44,7 +44,7 @@ data/scraped/
 │   ├── .cursor.json                            # ← present only if run unfinished; brand-root path so cross-invocation resume works (plan 01-16)
 │   ├── current/                                # ← symlink to most recent successful run (gitignored)
 │   └── 2026-04-28T07-30-00Z/                   # ← per-run dir (gitignored)
-│       ├── models.json                         # ← drom master-model records
+│       ├── models.json                         # ← drom master-model records (now includes complectations[] per record per Phase 01.1)
 │       ├── images/                             # ← hero WebP files
 │       │   ├── bmw-x5-g_2018_8395-hero.webp
 │       │   └── ...
@@ -120,6 +120,72 @@ pnpm exec tsx scripts/generate-report-html.mjs data/scraped/drom/<run_id>
 ```
 
 The orchestrator emits the viewer on EVERY run regardless of `final_status` (`ok` / `blocked` / `error`). Failed runs include the report's error summary so the operator can triage without `jq`.
+
+---
+
+## Phase 01.1: Per-trim deep-dive (BMW pilot)
+
+Phase 01.1 extends the drom catalog scraper to walk per-complectation detail pages, producing a nested `complectations[]` array on every `ModelRecord`. Six field groups are extracted per trim: Identity, Pricing, Drivetrain, Dimensions, Comfort, Tires. See `SCHEMA.md` for the full leaf-level schema.
+
+### Brand filter (BMW only in v1)
+
+Per-comp deep-dive runs ONLY for `brand_slug === 'bmw'`; other brands' generation handling is unchanged. This is hard-coded in `server/scrapers/drom/index.ts` as `BMW_PILOT_BRANDS = new Set(['bmw'])`. Multi-brand expansion is deferred to v1.x.
+
+### Adaptive rate limiting
+
+The polite delay is now adaptive (Phase 01.1 R-5):
+- Starts at 10 s (ceiling).
+- After 100 consecutive 200 OK responses, halves to 5 s (floor).
+- Resets to 10 s on any 429 / 5xx / block-detection match.
+
+See `server/scrapers/shared/rate-limiter.ts` for the pure-state implementation.
+
+### Per-trim cursor
+
+The cursor file (`data/scraped/drom/.cursor.json`, brand-root path from Phase 01-16) gains an optional `lastComplectationIndex` field. On a mid-pilot crash, resume re-fetches only the in-flight trim and continues from the next index. Cursor written every trim (sub-1KB JSON; cheap).
+
+Backward-compat: cursors written by Phase 01 (without the index field) load as `lastComplectationIndex === undefined`; the per-comp loop starts from index 0.
+
+### Field-coverage gate
+
+Each successful run emits `report.field_coverage` — an object with six per-group rates rounded to 2 dp:
+
+```json
+"field_coverage": {
+  "identity": 0.92,
+  "pricing": 0.85,
+  "drivetrain": 0.78,
+  "dimensions": 0.74,
+  "comfort": 0.81,
+  "tires": 0.71
+}
+```
+
+SPEC R-7 gate: every rate must be ≥ 0.70 for `final_status` to be `'ok'`. A failing gate aborts the run with a descriptive error message naming the under-threshold groups.
+
+### HTML viewer extension
+
+Each ModelRecord with non-empty `complectations[]` now renders a "Комплектации (N)" modal section in `current/index.html`, plus six "Coverage / <Group>" tiles in the header stats grid. Self-contained — no external network at view time.
+
+### BMW pilot run
+
+To execute the full BMW pilot (approximately 5–7 hours continuous, approximately 2 000 per-comp pages):
+
+```bash
+pnpm scrape:drom    # resumes from cursor by default
+```
+
+Output: `data/scraped/drom/<runId>/{models.json, report.json, current/index.html, current/images/*.webp}`.
+
+Sanity check after completion:
+
+```bash
+cat data/scraped/drom/current/report.json | jq '.field_coverage, .final_status'
+```
+
+Expect: every coverage rate >= 0.70 AND `final_status === 'ok'`.
+
+---
 
 ### Incremental snapshot (UPSERT semantics)
 
