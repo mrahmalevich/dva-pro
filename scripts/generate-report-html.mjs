@@ -1,0 +1,298 @@
+#!/usr/bin/env node
+// scripts/generate-report-html.mjs
+//
+// Generate a self-contained `index.html` viewer inside a scrape run directory.
+// Bakes models.json + report.json into the HTML so the file works when opened
+// directly via file:// (no local server needed, no CORS issues).
+//
+// Usage:
+//   node scripts/generate-report-html.mjs <run-dir>
+//
+// Example:
+//   node scripts/generate-report-html.mjs data/scraped/drom/current
+//
+// Phase 01.1 will integrate this into the drom orchestrator's run completion
+// so every future run gets an index.html automatically. This standalone script
+// is the immediate one-shot for already-completed runs.
+
+import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { resolve, basename, join } from 'node:path';
+
+const runDir = process.argv[2];
+if (!runDir) {
+  console.error('Usage: node scripts/generate-report-html.mjs <run-dir>');
+  process.exit(1);
+}
+const dir = resolve(runDir);
+const modelsPath = join(dir, 'models.json');
+const reportPath = join(dir, 'report.json');
+const imagesDir = join(dir, 'images');
+
+if (!existsSync(modelsPath)) {
+  console.error(`models.json not found at ${modelsPath}`);
+  process.exit(1);
+}
+if (!existsSync(reportPath)) {
+  console.error(`report.json not found at ${reportPath}`);
+  process.exit(1);
+}
+
+const models = JSON.parse(readFileSync(modelsPath, 'utf-8'));
+const report = JSON.parse(readFileSync(reportPath, 'utf-8'));
+const runId = basename(dir);
+const imageCount = existsSync(imagesDir)
+  ? readdirSync(imagesDir).filter((f) => f.endsWith('.webp')).length
+  : 0;
+
+const html = `<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Drom scrape — ${escapeHtml(runId)}</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --border: #30363d;
+    --fg: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+    --ok: #3fb950; --warn: #d29922; --err: #f85149;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, "Apple Color Emoji", sans-serif;
+    margin: 0; padding: 24px; line-height: 1.5;
+  }
+  header {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px 24px; margin-bottom: 24px;
+  }
+  h1 { margin: 0 0 8px; font-size: 20px; font-weight: 600; }
+  .runid { color: var(--muted); font-family: ui-monospace, SFMono-Regular, monospace; font-size: 13px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 16px; }
+  .stat { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 10px 14px; }
+  .stat-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-value { font-size: 18px; font-weight: 600; margin-top: 2px; }
+  .status-ok { color: var(--ok); }
+  .status-blocked, .status-error { color: var(--err); }
+  .filters {
+    display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px;
+  }
+  .filter { display: flex; flex-direction: column; gap: 4px; }
+  .filter label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .filter input, .filter select {
+    background: var(--bg); color: var(--fg); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 10px; font-size: 13px; min-width: 140px;
+  }
+  .grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;
+  }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    overflow: hidden; display: flex; flex-direction: column;
+    transition: border-color 120ms ease;
+  }
+  .card:hover { border-color: var(--accent); }
+  .thumb {
+    width: 100%; aspect-ratio: 4/3; background: #000;
+    display: flex; align-items: center; justify-content: center; color: var(--muted);
+    object-fit: cover;
+  }
+  .card-body { padding: 12px 14px; flex: 1; }
+  .brand { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .model { font-size: 16px; font-weight: 600; margin-top: 2px; }
+  .generation { color: var(--muted); font-size: 12px; font-family: ui-monospace, monospace; margin-top: 2px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; font-size: 12px; color: var(--muted); }
+  .badge {
+    background: rgba(88, 166, 255, 0.1); color: var(--accent);
+    padding: 2px 8px; border-radius: 12px; font-size: 11px;
+  }
+  .desc { font-size: 12px; color: var(--muted); margin-top: 8px; max-height: 60px; overflow: hidden; text-overflow: ellipsis; }
+  .source { display: block; padding: 8px 14px; border-top: 1px solid var(--border); font-size: 12px; color: var(--accent); text-decoration: none; }
+  .source:hover { background: rgba(88, 166, 255, 0.05); }
+  .empty { color: var(--muted); padding: 40px; text-align: center; grid-column: 1 / -1; }
+  .count { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+  .errors {
+    background: rgba(248, 81, 73, 0.08); border: 1px solid var(--err); color: var(--err);
+    border-radius: 8px; padding: 12px 16px; margin-top: 12px; font-size: 12px;
+    font-family: ui-monospace, monospace; white-space: pre-wrap;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Drom catalog scrape — <span class="status-${escapeAttr(report.final_status)}">${escapeHtml(report.final_status)}</span></h1>
+  <div class="runid">${escapeHtml(runId)}</div>
+  <div class="stats">
+    <div class="stat"><div class="stat-label">Records</div><div class="stat-value">${report.models_added}</div></div>
+    <div class="stat"><div class="stat-label">Pages visited</div><div class="stat-value">${report.pages_visited}</div></div>
+    <div class="stat"><div class="stat-label">Images downloaded</div><div class="stat-value">${report.images_downloaded}</div></div>
+    <div class="stat"><div class="stat-label">Errors</div><div class="stat-value">${report.errors.length}</div></div>
+    <div class="stat"><div class="stat-label">Blocked responses</div><div class="stat-value">${report.blocked_responses}</div></div>
+    <div class="stat"><div class="stat-label">Duration</div><div class="stat-value">${formatDuration(report.duration_ms)}</div></div>
+    <div class="stat"><div class="stat-label">Started</div><div class="stat-value" style="font-size:12px">${formatDate(report.started_at)}</div></div>
+    <div class="stat"><div class="stat-label">Resumed</div><div class="stat-value">${report.cursor_resumed ? 'yes' : 'no'}</div></div>
+  </div>
+  ${report.errors.length > 0 ? `<div class="errors">${escapeHtml(report.errors.slice(0, 10).join('\\n'))}${report.errors.length > 10 ? '\\n... ' + (report.errors.length - 10) + ' more' : ''}</div>` : ''}
+</header>
+
+<div class="filters">
+  <div class="filter">
+    <label for="search">Поиск (модель / поколение)</label>
+    <input id="search" type="text" placeholder="напр. Веста или g_2022">
+  </div>
+  <div class="filter">
+    <label for="brand">Марка</label>
+    <select id="brand"><option value="">— все —</option></select>
+  </div>
+  <div class="filter">
+    <label for="body">Тип кузова</label>
+    <select id="body"><option value="">— все —</option></select>
+  </div>
+  <div class="filter">
+    <label for="yearMin">Год от</label>
+    <input id="yearMin" type="number" placeholder="напр. 2010" min="1900" max="2030">
+  </div>
+</div>
+
+<div class="count" id="count"></div>
+<div class="grid" id="grid"></div>
+
+<script type="application/json" id="data">${JSON.stringify({ models, runId }).replace(/</g, '\\u003c')}</script>
+<script>
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const models = data.models;
+
+  const brandSel = document.getElementById('brand');
+  const bodySel = document.getElementById('body');
+  const search = document.getElementById('search');
+  const yearMin = document.getElementById('yearMin');
+  const grid = document.getElementById('grid');
+  const countEl = document.getElementById('count');
+
+  // Populate brand and body selects from data
+  const brands = [...new Set(models.map(m => m.brand))].sort();
+  for (const b of brands) {
+    const o = document.createElement('option');
+    o.value = b; o.textContent = b;
+    brandSel.appendChild(o);
+  }
+  const bodies = [...new Set(models.flatMap(m => m.body_types || []))].sort();
+  for (const b of bodies) {
+    const o = document.createElement('option');
+    o.value = b; o.textContent = b;
+    bodySel.appendChild(o);
+  }
+
+  function render() {
+    const q = search.value.trim().toLowerCase();
+    const brand = brandSel.value;
+    const body = bodySel.value;
+    const yMin = parseInt(yearMin.value, 10);
+
+    const filtered = models.filter(m => {
+      if (brand && m.brand !== brand) return false;
+      if (body && !(m.body_types || []).includes(body)) return false;
+      if (q && !(m.model + ' ' + m.generation).toLowerCase().includes(q)) return false;
+      if (!isNaN(yMin) && (m.year_to ?? m.year_from ?? 0) < yMin) return false;
+      return true;
+    });
+
+    countEl.textContent = filtered.length + ' / ' + models.length + ' records';
+    grid.innerHTML = '';
+
+    if (filtered.length === 0) {
+      const div = document.createElement('div');
+      div.className = 'empty';
+      div.textContent = 'Нет записей по фильтру';
+      grid.appendChild(div);
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    for (const m of filtered) {
+      const card = document.createElement('div');
+      card.className = 'card';
+
+      const imgPath = (m.image_paths && m.image_paths[0]) || null;
+      if (imgPath) {
+        const img = document.createElement('img');
+        img.className = 'thumb';
+        img.src = imgPath;
+        img.loading = 'lazy';
+        img.alt = m.brand + ' ' + m.model;
+        img.onerror = () => { img.replaceWith(noImage()); };
+        card.appendChild(img);
+      } else {
+        card.appendChild(noImage());
+      }
+
+      const body = document.createElement('div');
+      body.className = 'card-body';
+      body.innerHTML = '<div class="brand">' + esc(m.brand) + '</div>'
+        + '<div class="model">' + esc(m.model) + '</div>'
+        + '<div class="generation">' + esc(m.generation) + ' · '
+          + esc(m.year_from || '?') + '–' + esc(m.year_to || 'н.в.') + '</div>'
+        + '<div class="meta">'
+          + (m.body_types || []).map(b => '<span class="badge">' + esc(b) + '</span>').join(' ')
+        + '</div>'
+        + (m.description_ru ? '<div class="desc">' + esc(m.description_ru.slice(0, 200)) + '</div>' : '');
+      card.appendChild(body);
+
+      if (m.source_url) {
+        const a = document.createElement('a');
+        a.className = 'source';
+        a.href = m.source_url;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.textContent = '↗ открыть на drom.ru';
+        card.appendChild(a);
+      }
+
+      fragment.appendChild(card);
+    }
+    grid.appendChild(fragment);
+  }
+
+  function noImage() {
+    const d = document.createElement('div');
+    d.className = 'thumb';
+    d.textContent = 'без изображения';
+    return d;
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  search.addEventListener('input', render);
+  brandSel.addEventListener('change', render);
+  bodySel.addEventListener('change', render);
+  yearMin.addEventListener('input', render);
+  render();
+</script>
+</body>
+</html>
+`;
+
+const outPath = join(dir, 'index.html');
+writeFileSync(outPath, html, 'utf-8');
+console.log(`✓ wrote ${outPath} (${(html.length / 1024).toFixed(1)} KB, ${models.length} records, ${imageCount} images)`);
+
+function formatDuration(ms) {
+  const s = Math.floor(ms / 1000);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const r = s % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${r}s`;
+  return `${r}s`;
+}
+function formatDate(iso) {
+  return new Date(iso).toISOString().replace('T', ' ').replace(/\..+$/, ' UTC');
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function escapeAttr(s) {
+  return String(s).replace(/[^a-z0-9_-]/gi, '');
+}
