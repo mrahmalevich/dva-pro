@@ -1,0 +1,12 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`BMW pilot field-coverage snapshot golden (R-8) > locks per-group coverage rates rounded to 2 dp 1`] = `
+{
+  "comfort": 1,
+  "dimensions": 1,
+  "drivetrain": 1,
+  "identity": 1,
+  "pricing": 0,
+  "tires": 1,
+}
+`;
