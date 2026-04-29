@@ -15,24 +15,29 @@ import got from 'got';
 import { CookieJar } from 'tough-cookie';
 import pLimit from 'p-limit';
 import * as iconv from 'iconv-lite';
+import { ProbeDownLimiter } from './rate-limiter.js';
 
 const cookieJar = new CookieJar();
 const httpLimit = pLimit(1); // D-14: serial HTTP
 
-const POLITE_BASE_MS = 10_000; // D-14: 1 req per 10s
+// SPEC R-5: probe-down adaptive delay replaces the fixed 10s constant from Phase 01-D-14.
+// The limiter starts at 10s ceiling; halves to 5s floor after 100 OK; resets on 429/5xx.
+const limiter = new ProbeDownLimiter();
 const JITTER_RATIO = 0.20; // D-14: ±20%
 
 let lastRequestAt = 0;
 
 /**
- * Enforce polite spacing between sequential HTTP fetches per D-14.
- * Floor wait time is POLITE_BASE_MS * (1 - JITTER_RATIO) = 8s.
+ * Enforce polite spacing between sequential HTTP fetches per D-14 / SPEC R-5.
+ * Base delay is adaptive: starts at 10s ceiling, halves to 5s floor after 100 OK responses.
+ * Floor wait time is baseMs * (1 - JITTER_RATIO) = 4s at floor.
  *
  * Exported for fake-timer tests; production code paths invoke it locally inside fetchHtml/fetchBuffer.
  */
 export async function politeDelay(): Promise<void> {
+  const baseMs = limiter.getDelayMs();
   const elapsed = Date.now() - lastRequestAt;
-  const jitter = POLITE_BASE_MS * (1 + (Math.random() * 2 - 1) * JITTER_RATIO);
+  const jitter = baseMs * (1 + (Math.random() * 2 - 1) * JITTER_RATIO);
   const wait = Math.max(0, jitter - elapsed);
   if (wait > 0) await new Promise((r) => setTimeout(r, wait));
   lastRequestAt = Date.now();
@@ -71,6 +76,7 @@ export async function fetchHtml(url: string): Promise<string> {
   return httpLimit(async () => {
     await politeDelay();
     const response = await dromClient.get(url, { responseType: 'buffer' });
+    limiter.onResponse(response.statusCode);   // SPEC R-5; Pitfall 5: got.retry runs INSIDE .get(), so this sees the FINAL post-retry status
     const charset = charsetFromContentType(response.headers['content-type']);
     return iconv.decode(response.body as Buffer, charset);
   });
@@ -83,3 +89,6 @@ export async function fetchBuffer(url: string): Promise<Buffer> {
     return response.body as Buffer;
   });
 }
+
+/** Test-only export for integration tests + Plan 07 orchestrator wiring. */
+export const _testOnly = { limiter };
