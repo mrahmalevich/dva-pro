@@ -563,6 +563,118 @@ describe('drom orchestrator (SCRAPE-05, SCRAPE-09 end-to-end)', () => {
     vi.doUnmock('../scrapers/drom/parse-generation-page.js');
     vi.doUnmock('../scrapers/shared/http.js');
   }, 120_000);
+
+  it('cross-invocation cursor flow: cursor written by run N is read by run N+1 (BLOCKER 1 fix, plan 01-16)', async () => {
+    // Reset any prior current/ symlink from earlier tests in this file so the
+    // first run below starts from a clean state (no inherited records).
+    const dromRoot = resolve(workDir, 'data/scraped/drom');
+    const { unlink } = await import('node:fs/promises');
+    if (existsSync(resolve(dromRoot, 'current'))) {
+      await unlink(resolve(dromRoot, 'current'));
+    }
+    // Also delete any stale .cursor.json from prior tests — the BLOCKER 1 fix
+    // means the cursor file lives at the brand-root path; failing to clear it
+    // would let prior-test state leak into run #1.
+    const cursorPath = resolve(dromRoot, '.cursor.json');
+    if (existsSync(cursorPath)) await unlink(cursorPath);
+
+    const fixtures = {
+      heroJpeg: await readFile(FIXTURE_HERO),
+      brandIndexHtml: await readFile(FIXTURE_BRAND_INDEX, 'utf-8'),
+      modelListHtml: await readFile(FIXTURE_MODEL_LIST, 'utf-8'),
+      genListHtml: await readFile(FIXTURE_GEN_LIST, 'utf-8'),
+      genPageHtml: await readFile(FIXTURE_GEN_PAGE, 'utf-8'),
+    };
+
+    // Single brand bmw with two models [x3, x5]. Run #1 succeeds for x3 and
+    // throws for x5's generation page (synthetic mid-run crash). The cursor
+    // written after x3 completes must persist at the brand-root path so run
+    // #2 (resume:true) can pick it up.
+    vi.doMock('../scrapers/drom/parse-brand-index.js', () => ({
+      parseBrandIndex: () => [
+        { brand_slug: 'bmw', latin_name: 'BMW', url: 'https://www.drom.ru/catalog/bmw/' },
+      ],
+    }));
+    vi.doMock('../scrapers/drom/parse-model-list.js', () => ({
+      parseModelList: (_html: string, brandUrl: string) => [
+        { model_slug: 'x3', ru_name: 'X3', latin_name: 'X3', url: `${brandUrl}x3/` },
+        { model_slug: 'x5', ru_name: 'X5', latin_name: 'X5', url: `${brandUrl}x5/` },
+      ],
+    }));
+    vi.doMock('../scrapers/drom/parse-generation-list.js', () => ({
+      parseGenerationList: (_html: string, modelUrl: string) => [
+        {
+          generation_id: 'g_201808_8395',
+          generation_label: 'G05',
+          url: `${modelUrl}g_201808_8395/`,
+          hero_image_url: 'https://s.auto.drom.ru/i24222/c/photos/generations/500x_test.jpg',
+        },
+      ],
+    }));
+
+    // phase=1: throw on the x5 generation page fetch (mid-run crash).
+    // phase=2: every fetch succeeds (run #2 resumes cleanly).
+    let phase = 1;
+    vi.doMock('../scrapers/shared/http.js', () => ({
+      fetchHtml: async (url: string) => {
+        if (phase === 1 && /\/x5\/g_/.test(url)) {
+          throw new Error('synthetic mid-run crash on x5');
+        }
+        if (/g_\d{4,6}_\d+\/?$/.test(url)) return fixtures.genPageHtml;
+        const segs = url
+          .replace(/^https?:\/\/www\.drom\.ru/, '')
+          .split('/')
+          .filter(Boolean);
+        if (segs[0] !== 'catalog') throw new Error(`Unexpected URL: ${url}`);
+        if (segs.length === 1) return fixtures.brandIndexHtml;
+        if (segs.length === 2) return fixtures.modelListHtml;
+        if (segs.length === 3) return fixtures.genListHtml;
+        throw new Error(`Unexpected URL: ${url}`);
+      },
+      fetchBuffer: async () => fixtures.heroJpeg,
+      politeDelay: async () => {},
+      dromClient: {
+        get: () => {
+          throw new Error('dromClient should not be invoked');
+        },
+      },
+    }));
+
+    vi.resetModules();
+    const { drom: dromRun1 } = await import('../scrapers/drom/index.js');
+    const result1 = await dromRun1.run({ resume: false });
+    expect(result1.status).toBe('error');
+
+    // BLOCKER 1 fix verification: the cursor file lives at the brand-root path,
+    // NOT inside any per-run dir. This is what makes cross-invocation resume
+    // work — run N+1 reads the same path run N wrote to.
+    expect(existsSync(cursorPath)).toBe(true);
+    const cursorRaw = await readFile(cursorPath, 'utf-8');
+    const cursorData = JSON.parse(cursorRaw);
+    expect(cursorData.lastBrandSlug).toBe('bmw');
+    // x3 completed before x5 crashed → cursor records x3 as the last completed model.
+    expect(cursorData.lastModelSlug).toBe('x3');
+
+    // Run #2: phase=2 disables the synthetic crash. Resume must read the
+    // cursor from the brand-root path. CR-04 contract (plan 01-12) re-scrapes
+    // the cursored brand from scratch, so both x3 and x5 succeed cleanly.
+    phase = 2;
+    vi.resetModules();
+    const { drom: dromRun2 } = await import('../scrapers/drom/index.js');
+    const result2 = await dromRun2.run({ resume: true });
+    expect(result2.status).toBe('ok');
+    if (result2.status === 'ok') {
+      expect(result2.report.cursor_resumed).toBe(true);
+    }
+
+    // After clean completion, the cursor at the brand-root path is deleted.
+    expect(existsSync(cursorPath)).toBe(false);
+
+    vi.doUnmock('../scrapers/drom/parse-brand-index.js');
+    vi.doUnmock('../scrapers/drom/parse-model-list.js');
+    vi.doUnmock('../scrapers/drom/parse-generation-list.js');
+    vi.doUnmock('../scrapers/shared/http.js');
+  }, 180_000);
 });
 
 describe('drom orchestrator resume path (gap-closure 01-13: CR-01..CR-04, IN-07)', () => {

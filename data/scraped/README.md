@@ -41,6 +41,7 @@ data/scraped/
 ├── README.md                                   # ← this file, committed
 ├── drom/
 │   ├── brand-aliases.json                      # ← committed (small Cyrillic↔Latin seed)
+│   ├── .cursor.json                            # ← present only if run unfinished; brand-root path so cross-invocation resume works (plan 01-16)
 │   ├── current/                                # ← symlink to most recent successful run (gitignored)
 │   └── 2026-04-28T07-30-00Z/                   # ← per-run dir (gitignored)
 │       ├── models.json                         # ← drom master-model records
@@ -48,8 +49,7 @@ data/scraped/
 │       │   ├── bmw-x5-g_2018_8395-hero.webp
 │       │   └── ...
 │       ├── report.json                         # ← run telemetry (D-17)
-│       ├── index.html                          # ← per-run operator viewer (auto-emitted by orchestrator; plan 01-15)
-│       └── .cursor.json                        # ← present only if run unfinished
+│       └── index.html                          # ← per-run operator viewer (auto-emitted by orchestrator; plan 01-15)
 └── fx/
     └── cbr-2026-04-28.json                     # ← per-UTC-day FX cache (gitignored)
 ```
@@ -90,9 +90,10 @@ If a `pnpm scrape:drom` run dies mid-brand, the next invocation reads `.cursor.j
 1. **Prior brands are preserved verbatim** — `inheritFromPrevCurrent` copies records and images from the previous successful `current/` snapshot into the new run dir before scraping starts. Brands that completed before the crash do NOT need to be re-fetched.
 2. **The cursored brand is re-scraped from scratch** — when the loop reaches the brand `cursor.lastBrandSlug`, `startFromModelIndex = 0`. Partial brand-aliases entries from the aborted brand are reconstructed because the brand is fully re-scraped and `mergeAliases` runs at end-of-brand on the complete set. Worst case: ~1 brand's worth of pages re-fetched (~7 hours at 10 s/req × ~30 pages/model × ~50 models for a brand-heavy entry like Toyota; smaller brands recover in minutes).
 3. **Brands lexicographically after the cursored brand are scraped fresh** — they were never reached in the aborted run.
-4. **A corrupt or hand-edited `.cursor.json` aborts the run loudly** — `readCursor` (post plan 01-11) distinguishes "file absent" (fresh start) from "file present but malformed" (`CorruptCursorError`, exit 1). Delete the file explicitly to start a fresh run after corruption.
-5. **A `cursor.lastBrandSlug` no longer present in the catalog aborts the run** — `Cursor.lastBrandSlug='X' not present in current brand list` (plan 01-10). Either re-run without `--resume` semantics (delete `.cursor.json`) or correct the brand list (e.g. unset `DROM_BRAND_WHITELIST`).
-6. **On clean completion `.cursor.json` is deleted.**
+4. **The cursor file lives at the brand-root path** — `data/scraped/drom/.cursor.json`, NOT inside any per-run `runId` directory. This stable location is what makes cross-invocation resume work: run N writes the cursor; run N+1 reads it (plan 01-16). The orchestrator computes the path once at the top of `drom.run()` and passes it to every cursor call site so `readCursor`, `writeCursor`, and `deleteCursor` operate on the same file across invocations.
+5. **A corrupt or hand-edited `.cursor.json` aborts the run loudly** — `readCursor` (post plan 01-11) distinguishes "file absent" (fresh start) from "file present but malformed" (`CorruptCursorError`, exit 1). Delete the file explicitly to start a fresh run after corruption.
+6. **A `cursor.lastBrandSlug` no longer present in the catalog aborts the run** — `Cursor.lastBrandSlug='X' not present in current brand list` (plan 01-10). Either re-run without `--resume` semantics (delete `.cursor.json`) or correct the brand list (e.g. unset `DROM_BRAND_WHITELIST`).
+7. **On clean completion `.cursor.json` is deleted.**
 
 The brand-boundary granularity is a deliberate Phase 1 trade-off documented in `01-REVIEW.md` (CR-04). Finer-grained cursors (per-model checkpoint persistence) are a Phase 1.x candidate; the snapshot path makes the trade-off acceptable for v1 because no records are permanently lost — only the cursored brand's pages are re-fetched.
 
