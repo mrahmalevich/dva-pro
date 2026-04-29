@@ -177,7 +177,7 @@ exports[`writeReportHtml (plan 01-15) > renders a byte-stable HTML for a fixed i
   <div class="modal" id="modal-content"></div>
 </div>
 
-<script type="application/json" id="data">{"models":[{"brand":"BMW","brand_slug":"bmw","model":"X5","model_slug":"x5","generation":"g_201808_8395","year_from":2018,"year_to":2022,"body_types":["SUV"],"engine_options":[{"cc":2998,"hp":340,"fuel":"gas"}],"drive_options":["AWD"],"description_ru":"Четвёртое поколение премиального кроссовера.","price_min_rub":5470000,"price_max_rub":9890000,"image_paths":["images/bmw-x5-g_201808_8395-hero.webp"],"source":"drom-catalog","source_url":"https://www.drom.ru/catalog/bmw/x5/g_201808_8395/","scraped_at":"2026-04-28T12:00:00.000Z"}],"runId":"fixed-snapshot-runid"}</script>
+<script type="application/json" id="data">{"models":[{"brand":"BMW","brand_slug":"bmw","model":"X5","model_slug":"x5","generation":"g_201808_8395","year_from":2018,"year_to":2022,"body_types":["SUV"],"engine_options":[{"cc":2998,"hp":340,"fuel":"gas"}],"drive_options":["AWD"],"description_ru":"Четвёртое поколение премиального кроссовера.","price_min_rub":5470000,"price_max_rub":9890000,"image_paths":["images/bmw-x5-g_201808_8395-hero.webp"],"source":"drom-catalog","source_url":"https://www.drom.ru/catalog/bmw/x5/g_201808_8395/","scraped_at":"2026-04-28T12:00:00.000Z","complectations":[]}],"runId":"fixed-snapshot-runid"}</script>
 <script>
   const data = JSON.parse(document.getElementById('data').textContent);
   const models = data.models;

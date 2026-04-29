@@ -1,6 +1,73 @@
 // server/scrapers/shared/types.ts
 import { z } from 'zod';
 
+// -- Complectation sub-schema (Phase 01.1) --
+const Identity = z.object({
+  name: z.string().nullable(),
+  period_from: z.string().nullable(),
+  period_to: z.string().nullable(),
+  tier: z.enum(['Базовая', 'Предмаксимальная', 'Максимальная']).nullable(),
+  engine_code: z.string().nullable(),
+  frame_code: z.string().nullable(),
+  source_url: z.string().url().nullable(),
+}); // 7 leaves — D-06 threshold ≥5
+
+const Pricing = z.object({
+  price_new_rub: z.number().nullable(),
+  price_used_from_rub: z.number().nullable(),
+}); // 2 leaves — D-06 threshold ≥2 (effectively all)
+
+const Drivetrain = z.object({
+  engine_cc: z.number().int().nullable(),
+  engine_hp: z.number().int().nullable(),
+  engine_fuel: z.enum(['gas', 'diesel', 'hybrid', 'electric']).nullable(),
+  drive: z.string().nullable(),
+  transmission_type: z.enum(['AT', 'MT', 'CVT', 'AMT']).nullable(),
+  transmission_gears: z.number().int().nullable(),
+}); // 6 leaves — D-06 threshold ≥4
+
+const Dimensions = z.object({
+  length_mm: z.number().nullable(),
+  width_mm: z.number().nullable(),
+  height_mm: z.number().nullable(),
+  wheelbase_mm: z.number().nullable(),
+  clearance_mm: z.number().nullable(),
+  trunk_min_l: z.number().nullable(),
+  trunk_max_l: z.number().nullable(),
+  curb_weight_kg: z.number().nullable(),
+  gross_weight_kg: z.number().nullable(),
+}); // 9 leaves — D-06 threshold ≥6
+
+const Comfort = z.object({
+  seats: z.number().int().nullable(),
+  doors: z.number().int().nullable(),
+  fuel_consumption_city_l: z.number().nullable(),
+  fuel_consumption_highway_l: z.number().nullable(),
+  fuel_consumption_combined_l: z.number().nullable(),
+  tank_l: z.number().nullable(),
+}); // 6 leaves — D-06 threshold ≥4
+
+const Tires = z.object({
+  tires_front: z.string().nullable(),
+  tires_rear: z.string().nullable(),
+}); // 2 leaves — D-06 threshold ≥2 (effectively all)
+
+export const Complectation = z.object({
+  identity: Identity,
+  pricing: Pricing,
+  drivetrain: Drivetrain,
+  dimensions: Dimensions,
+  comfort: Comfort,
+  tires: Tires,
+  _extraction_errors: z
+    .array(z.object({ group: z.string(), message: z.string() }))
+    .optional(),
+});
+export type Complectation = z.infer<typeof Complectation>;
+
+// Per-group sub-schemas re-exported for use in parser unit tests + per-section extractors.
+export { Identity, Pricing, Drivetrain, Dimensions, Comfort, Tires };
+
 export const ModelRecord = z.object({
   brand: z.string(),
   brand_slug: z.string(),
@@ -23,8 +90,18 @@ export const ModelRecord = z.object({
   source: z.literal('drom-catalog'),
   source_url: z.string().url(),
   scraped_at: z.string().datetime(),
+  complectations: z.array(Complectation).default([]),
 });
 export type ModelRecord = z.infer<typeof ModelRecord>;
+
+export type FieldCoverage = {
+  identity: number;
+  pricing: number;
+  drivetrain: number;
+  dimensions: number;
+  comfort: number;
+  tires: number;
+};
 
 export type ReportSummary = {
   started_at: string;
@@ -42,6 +119,7 @@ export type ReportSummary = {
   fx_stale: boolean;
   cursor_resumed: boolean;
   image_failure_rate: number;
+  field_coverage?: FieldCoverage;
   final_status: 'ok' | 'blocked' | 'error';
 };
 

@@ -47,6 +47,7 @@ const sampleModel: ModelRecord = {
   source: 'drom-catalog',
   source_url: 'https://www.drom.ru/catalog/bmw/x5/g_201808_8395/',
   scraped_at: '2026-04-28T12:00:00.000Z',
+  complectations: [],
 };
 
 const sampleReport: ReportSummary = {
