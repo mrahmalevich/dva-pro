@@ -17,6 +17,7 @@ import { parseGenerationList } from '../scrapers/drom/parse-generation-list.js';
 import {
   parseGenerationPage,
   extractHeroImageUrl,
+  extractTrimRows,
 } from '../scrapers/drom/parse-generation-page.js';
 import { ModelRecord } from '../scrapers/shared/types.js';
 
@@ -206,5 +207,24 @@ describe('DROM_BRAND_WHITELIST env var filter (plan 07 / plan 09 smoke gate)', (
   it('silently drops unknown brands in the whitelist', () => {
     process.env.DROM_BRAND_WHITELIST = 'lada,nosuchbrand';
     expect(applyWhitelist(ALL)).toEqual([{ brand_slug: 'lada' }]);
+  });
+});
+
+describe('extractTrimRows (Phase 01.1, plan 05)', () => {
+  it('extracts >= 30 trim rows from the BMW X5 G05 generation fixture', () => {
+    const html = fix('generation.bmw.x5.g05.html');
+    const rows = extractTrimRows(html, {
+      brand: 'BMW', brand_slug: 'bmw',
+      model: 'X5', model_slug: 'x5',
+      generation: 'g_201808_8395',
+      sourceUrl: 'https://www.drom.ru/catalog/bmw/x5/g_201808_8395/',
+    });
+    expect(rows.length).toBeGreaterThanOrEqual(30);
+    expect(rows.every((r) => r.comp_id && /^\d+$/.test(r.comp_id))).toBe(true);
+    expect(rows.every((r) => r.url.startsWith('https://www.drom.ru/catalog/bmw/x5/'))).toBe(true);
+    // At least one trim should match a known tier
+    expect(rows.some((r) => r.tier === 'Базовая' || r.tier === 'Предмаксимальная' || r.tier === 'Максимальная')).toBe(true);
+    // At least one trim should have a non-null price_new_rub
+    expect(rows.some((r) => r.price_new_rub !== null && r.price_new_rub > 1000000)).toBe(true);
   });
 });

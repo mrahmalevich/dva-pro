@@ -47,6 +47,29 @@ export interface GenerationPageContext {
   heroImageUrl?: string;
 }
 
+/**
+ * A single trim-row reference extracted from the generation page complectation table.
+ * Identity + Pricing leaves come from this record (no per-comp re-fetch needed).
+ * Engine/drive fields (engine_cc, engine_hp, engine_fuel, drive) are null here —
+ * they are populated by the orchestrator (Plan 07) via cross-walk with engine_options[].
+ */
+export interface TrimRowRef {
+  comp_id: string;
+  url: string;
+  name: string | null;
+  period_from: string | null;
+  period_to: string | null;
+  tier: 'Базовая' | 'Предмаксимальная' | 'Максимальная' | null;
+  engine_code: string | null;
+  frame_code: string | null;
+  price_new_rub: number | null;
+  price_used_from_rub: number | null;
+  engine_cc: number | null;
+  engine_hp: number | null;
+  engine_fuel: 'gas' | 'diesel' | 'hybrid' | 'electric' | null;
+  drive: string | null;
+}
+
 type EngineSpec = {
   cc: number;
   hp: number;
@@ -257,4 +280,138 @@ export function parseGenerationPage(html: string, ctx: GenerationPageContext): M
   // Pitfall 1: zod throws on schema violation (e.g. body_types had a non-string).
   // The orchestrator catches the throw and adds the URL to report.errors[].
   return ModelRecordSchema.parse(record);
+}
+
+/**
+ * Extract all trim rows from a generation page's complectation table.
+ * Each `<tbody>` in the complectation table represents one engine group; within
+ * each tbody, `<tr class="y7l57t2">` rows represent individual trim variants.
+ *
+ * SPEC R-4 / D-01..D-03: this function is the single source of truth for
+ * TrimRowRef[] — used by Plan 07 orchestrator to iterate per-comp pages.
+ *
+ * Note: engine_cc / engine_hp / engine_fuel / drive are set to null here.
+ * The orchestrator cross-walks these from the parent generation's engine_options[]
+ * by tbody position, then passes them through ComplectationPageContext.trimRow.
+ */
+export function extractTrimRows(html: string, ctx: GenerationPageContext): TrimRowRef[] {
+  const $ = cheerio.load(html);
+  const rows: TrimRowRef[] = [];
+
+  // The complectation table has one <tbody> per engine group.
+  // Each tbody starts with a header row (engine spec + codes) and then
+  // one or more <tr class="y7l57t2"> trim rows.
+  $('tbody').each((_, tbodyEl) => {
+    const $tbody = $(tbodyEl);
+
+    // Extract engine_code and frame_code from the engine-group header.
+    // They appear as linked text inside ._13wmddp3 spans labeled "Двигатель:" and "Кузов:".
+    let engine_code: string | null = null;
+    let frame_code: string | null = null;
+    let price_used_from_rub: number | null = null;
+
+    $tbody.find('._13wmddp0').each((_, rowEl) => {
+      const $row = $(rowEl);
+      const labelText = $row.find('._13wmddp1').text().trim();
+      const valueText = $row.find('._13wmddp2').text().trim();
+      if (labelText.includes('Двигатель')) {
+        engine_code = $row.find('._13wmddp3 a').text().trim() || valueText || null;
+        if (engine_code === '') engine_code = null;
+      } else if (labelText.includes('Кузов')) {
+        frame_code = $row.find('._13wmddp3 a').text().trim() || valueText || null;
+        if (frame_code === '') frame_code = null;
+      } else if (labelText.includes('б/у') || labelText.includes('Цена б')) {
+        // "Цена б/у:" → "от 16 500 000 ₽"
+        const m = valueText.replace(/\s/g, '').match(/от([\d]+)/);
+        if (m) price_used_from_rub = Number(m[1]);
+      }
+    });
+
+    // Iterate individual trim rows.
+    $tbody.find('tr.y7l57t2').each((_, trEl) => {
+      const $tr = $(trEl);
+
+      // Find the comp link: <a class="g6gv8w4 g6gv8w7" href="/catalog/bmw/x5/207354/">
+      // There may be multiple links (photo links also match). We want the one with trim name text.
+      const trimLinkPattern = new RegExp(`/catalog/${ctx.brand_slug}/${ctx.model_slug}/(\\d+)/?$`);
+      let comp_id: string | null = null;
+      let url: string | null = null;
+      let name: string | null = null;
+
+      $tr.find('a[href]').each((_, aEl) => {
+        const href = $(aEl).attr('href') || '';
+        const m = href.match(trimLinkPattern);
+        if (!m) return;
+        const text = $(aEl).text().trim();
+        // We want the link that has non-empty visible text (the trim name link).
+        // Photo links have no visible text (only img children).
+        if (text.length > 0 && comp_id === null) {
+          comp_id = m[1];
+          url = href.startsWith('http') ? href : `https://www.drom.ru${href}`;
+          name = text || null;
+        }
+      });
+
+      if (!comp_id) return; // no valid trim link in this row, skip
+
+      // Tier: <span class="_1hw1iq10"> within the name TD
+      const tierText = $tr.find('._1hw1iq10').first().text().trim();
+      const KNOWN_TIERS = ['Базовая', 'Предмаксимальная', 'Максимальная'] as const;
+      const tier = (KNOWN_TIERS.find((t) => t === tierText) ?? null) as TrimRowRef['tier'];
+
+      // Period: the 3rd <td class="y7l57t0"> (0-indexed: [2])
+      // Format: "08.2018 - 03.2022" or "с 04.2020" or similar.
+      const priceCells = $tr.find('td.y7l57t0');
+      // The period cell is the 3rd td (index 2, after icon-td and name-td)
+      // But the icon td is y7l57t0 y7l57t1, while period is plain y7l57t0.
+      // Simpler: find the td containing a date-like text pattern.
+      let period_from: string | null = null;
+      let period_to: string | null = null;
+
+      priceCells.each((idx, tdEl) => {
+        const cellText = $(tdEl).text().trim();
+        const periodMatch = cellText.match(/^(\d{2}\.\d{4})\s*-\s*(\d{2}\.\d{4})$/)
+          || cellText.match(/^с\s*(\d{2}\.\d{4})$/)
+          || cellText.match(/^(\d{2}\.\d{4})\s*-\s*(\d{2}\.\d{4})/);
+        if (periodMatch && period_from === null) {
+          if (periodMatch[2]) {
+            period_from = periodMatch[1];
+            period_to = periodMatch[2];
+          } else {
+            period_from = periodMatch[1];
+            period_to = null;
+          }
+        }
+      });
+
+      // Price (new): td.y7l57t0 containing ₽ symbol.
+      let price_new_rub: number | null = null;
+      priceCells.each((_, tdEl) => {
+        const cellText = $(tdEl).text();
+        if (cellText.includes('₽') && price_new_rub === null) {
+          const m = cellText.replace(/\s/g, '').match(/([\d]+)₽/);
+          if (m) price_new_rub = Number(m[1]);
+        }
+      });
+
+      rows.push({
+        comp_id,
+        url: url!,
+        name,
+        period_from,
+        period_to,
+        tier,
+        engine_code,
+        frame_code,
+        price_new_rub,
+        price_used_from_rub,
+        engine_cc: null,
+        engine_hp: null,
+        engine_fuel: null,
+        drive: null,
+      });
+    });
+  });
+
+  return rows;
 }
