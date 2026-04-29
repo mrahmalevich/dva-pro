@@ -1,0 +1,531 @@
+// server/scrapers/shared/report-html.ts
+//
+// Single source of truth for the per-run scrape viewer.
+// Called by:
+//   - server/scrapers/drom/index.ts (orchestrator end-of-run)
+//   - scripts/generate-report-html.mjs (backward-compat one-shot CLI for runs
+//     predating the orchestrator integration)
+//
+// Output: a self-contained <runDir>/index.html that opens via file:// in any
+// modern browser (no server, no CORS), bakes models.json + report.json into a
+// <script type="application/json"> block, and references images via relative
+// paths under <runDir>/images/.
+
+import { readFile } from 'node:fs/promises';
+import { existsSync, readdirSync } from 'node:fs';
+import { resolve, basename, join } from 'node:path';
+import { atomicWriteFile } from './atomic-write.js';
+import type { ModelRecord, ReportSummary } from './types.js';
+
+export interface WriteReportHtmlOptions {
+  /** Pre-loaded model records (skip re-reading models.json from disk). */
+  models?: ModelRecord[];
+  /** Pre-loaded report summary (skip re-reading report.json from disk). */
+  report?: ReportSummary;
+}
+
+const DEFAULT_REPORT: ReportSummary = {
+  started_at: '',
+  finished_at: '',
+  duration_ms: 0,
+  pages_visited: 0,
+  models_added: 0,
+  models_updated: 0,
+  images_downloaded: 0,
+  images_skipped: 0,
+  images_failed: 0,
+  errors: [],
+  rate_limit_hits: 0,
+  blocked_responses: 0,
+  fx_stale: false,
+  cursor_resumed: false,
+  image_failure_rate: 0,
+  final_status: 'error',
+};
+
+/**
+ * Generate `<runDir>/index.html` from models.json + report.json on disk
+ * (or from the provided in-memory data via `opts`). Idempotent: safe to call
+ * multiple times against the same runDir.
+ */
+export async function writeReportHtml(
+  runDir: string,
+  opts: WriteReportHtmlOptions = {},
+): Promise<void> {
+  const dir = resolve(runDir);
+  const modelsPath = join(dir, 'models.json');
+  const reportPath = join(dir, 'report.json');
+  const imagesDir = join(dir, 'images');
+
+  const models: ModelRecord[] =
+    opts.models ??
+    (existsSync(modelsPath)
+      ? (JSON.parse(await readFile(modelsPath, 'utf-8')) as ModelRecord[])
+      : []);
+  const report: ReportSummary =
+    opts.report ??
+    (existsSync(reportPath)
+      ? (JSON.parse(await readFile(reportPath, 'utf-8')) as ReportSummary)
+      : { ...DEFAULT_REPORT });
+
+  const runId = basename(dir);
+  const imageCount = existsSync(imagesDir)
+    ? readdirSync(imagesDir).filter((f) => f.endsWith('.webp')).length
+    : 0;
+
+  const html = renderHtml({ runId, models, report, imageCount });
+  await atomicWriteFile(join(dir, 'index.html'), html);
+}
+
+function renderHtml(data: {
+  runId: string;
+  models: ModelRecord[];
+  report: ReportSummary;
+  imageCount: number;
+}): string {
+  const { runId, models, report, imageCount } = data;
+  void imageCount; // currently unused in stats grid; reserved for future field
+
+  // Errors block: post-plan-14 errors are {url, message, kind} objects.
+  // Format as 'url: message' for the operator view; the `kind` field is
+  // INTERNAL and is NOT user-facing in the viewer.
+  const errorsBlock =
+    report.errors.length > 0
+      ? `<div class="errors">${escapeHtml(
+          report.errors
+            .slice(0, 10)
+            .map((e) => `${e.url}: ${e.message}`)
+            .join('\n'),
+        )}${report.errors.length > 10 ? '\n... ' + (report.errors.length - 10) + ' more' : ''}</div>`
+      : '';
+
+  return `<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Drom scrape — ${escapeHtml(runId)}</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --border: #30363d;
+    --fg: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+    --ok: #3fb950; --warn: #d29922; --err: #f85149;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, "Apple Color Emoji", sans-serif;
+    margin: 0; padding: 24px; line-height: 1.5;
+  }
+  header {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px 24px; margin-bottom: 24px;
+  }
+  h1 { margin: 0 0 8px; font-size: 20px; font-weight: 600; }
+  .runid { color: var(--muted); font-family: ui-monospace, SFMono-Regular, monospace; font-size: 13px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 16px; }
+  .stat { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 10px 14px; }
+  .stat-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-value { font-size: 18px; font-weight: 600; margin-top: 2px; }
+  .status-ok { color: var(--ok); }
+  .status-blocked, .status-error { color: var(--err); }
+  .filters {
+    display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px;
+  }
+  .filter { display: flex; flex-direction: column; gap: 4px; }
+  .filter label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .filter input, .filter select {
+    background: var(--bg); color: var(--fg); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 10px; font-size: 13px; min-width: 140px;
+  }
+  .grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;
+  }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    overflow: hidden; display: flex; flex-direction: column;
+    transition: border-color 120ms ease, transform 120ms ease;
+    cursor: pointer; text-align: left; font: inherit; color: inherit;
+    padding: 0; width: 100%;
+  }
+  .card:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .thumb {
+    width: 100%; aspect-ratio: 4/3; background: #000;
+    display: flex; align-items: center; justify-content: center; color: var(--muted);
+    object-fit: cover;
+  }
+  .card-body { padding: 12px 14px; flex: 1; }
+  .brand { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .model { font-size: 16px; font-weight: 600; margin-top: 2px; }
+  .generation { color: var(--muted); font-size: 12px; font-family: ui-monospace, monospace; margin-top: 2px; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; font-size: 12px; color: var(--muted); }
+  .badge {
+    background: rgba(88, 166, 255, 0.1); color: var(--accent);
+    padding: 2px 8px; border-radius: 12px; font-size: 11px;
+  }
+  .desc { font-size: 12px; color: var(--muted); margin-top: 8px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .price-pill { background: rgba(63,185,80,0.12); color: var(--ok); padding: 2px 8px; border-radius: 12px; font-size: 11px; }
+  .empty { color: var(--muted); padding: 40px; text-align: center; grid-column: 1 / -1; }
+  .count { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+  .errors {
+    background: rgba(248, 81, 73, 0.08); border: 1px solid var(--err); color: var(--err);
+    border-radius: 8px; padding: 12px 16px; margin-top: 12px; font-size: 12px;
+    font-family: ui-monospace, monospace; white-space: pre-wrap;
+  }
+  /* Modal / details overlay */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    display: none; align-items: flex-start; justify-content: center;
+    z-index: 1000; padding: 24px; overflow-y: auto;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    width: 100%; max-width: 920px; max-height: calc(100vh - 48px);
+    overflow-y: auto; position: relative;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .modal-close {
+    position: sticky; top: 0; float: right;
+    background: var(--panel); color: var(--muted);
+    border: 1px solid var(--border); border-radius: 50%;
+    width: 32px; height: 32px; font-size: 18px; line-height: 1;
+    cursor: pointer; margin: 12px; z-index: 1;
+  }
+  .modal-close:hover { color: var(--fg); border-color: var(--accent); }
+  .modal-hero {
+    width: 100%; max-height: 50vh; object-fit: contain;
+    background: #000; display: block;
+  }
+  .modal-body { padding: 24px 28px 28px; }
+  .modal-brand { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .modal-title { font-size: 24px; font-weight: 600; margin: 4px 0 4px; }
+  .modal-subtitle { color: var(--muted); font-family: ui-monospace, SFMono-Regular, monospace; font-size: 13px; margin-bottom: 16px; }
+  .modal-section { margin-top: 20px; }
+  .modal-section h3 {
+    color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+    margin: 0 0 8px; font-weight: 500;
+  }
+  .modal-section p, .modal-section .desc-full { margin: 0; font-size: 14px; line-height: 1.55; }
+  .modal-section .desc-full { white-space: pre-wrap; word-break: break-word; }
+  .kv {
+    display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px;
+    font-size: 13px; align-items: baseline;
+  }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; font-family: ui-monospace, monospace; word-break: break-all; }
+  .kv dd a { color: var(--accent); text-decoration: none; }
+  .kv dd a:hover { text-decoration: underline; }
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+  .gallery img {
+    width: 100%; aspect-ratio: 4/3; object-fit: cover;
+    border: 1px solid var(--border); border-radius: 6px; background: #000;
+  }
+  .badges-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .modal a.source-link {
+    display: inline-block; padding: 8px 16px; margin-top: 16px;
+    background: rgba(88,166,255,0.1); color: var(--accent);
+    border-radius: 6px; font-size: 13px; text-decoration: none;
+  }
+  .modal a.source-link:hover { background: rgba(88,166,255,0.2); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Drom catalog scrape — <span class="status-${escapeAttr(report.final_status)}">${escapeHtml(report.final_status)}</span></h1>
+  <div class="runid">${escapeHtml(runId)}</div>
+  <div class="stats">
+    <div class="stat"><div class="stat-label">Records</div><div class="stat-value">${report.models_added}</div></div>
+    <div class="stat"><div class="stat-label">Pages visited</div><div class="stat-value">${report.pages_visited}</div></div>
+    <div class="stat"><div class="stat-label">Images downloaded</div><div class="stat-value">${report.images_downloaded}</div></div>
+    <div class="stat"><div class="stat-label">Errors</div><div class="stat-value">${report.errors.length}</div></div>
+    <div class="stat"><div class="stat-label">Blocked responses</div><div class="stat-value">${report.blocked_responses}</div></div>
+    <div class="stat"><div class="stat-label">Duration</div><div class="stat-value">${formatDuration(report.duration_ms)}</div></div>
+    <div class="stat"><div class="stat-label">Started</div><div class="stat-value" style="font-size:12px">${formatDate(report.started_at)}</div></div>
+    <div class="stat"><div class="stat-label">Resumed</div><div class="stat-value">${report.cursor_resumed ? 'yes' : 'no'}</div></div>
+  </div>
+  ${errorsBlock}
+</header>
+
+<div class="filters">
+  <div class="filter">
+    <label for="search">Поиск (модель / поколение)</label>
+    <input id="search" type="text" placeholder="напр. Веста или g_2022">
+  </div>
+  <div class="filter">
+    <label for="brand">Марка</label>
+    <select id="brand"><option value="">— все —</option></select>
+  </div>
+  <div class="filter">
+    <label for="body">Тип кузова</label>
+    <select id="body"><option value="">— все —</option></select>
+  </div>
+  <div class="filter">
+    <label for="yearMin">Год от</label>
+    <input id="yearMin" type="number" placeholder="напр. 2010" min="1900" max="2030">
+  </div>
+</div>
+
+<div class="count" id="count"></div>
+<div class="grid" id="grid"></div>
+
+<div class="modal-backdrop" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="modal" id="modal-content"></div>
+</div>
+
+<script type="application/json" id="data">${JSON.stringify({ models, runId }).replace(/</g, '\\u003c')}</script>
+<script>
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const models = data.models;
+
+  const brandSel = document.getElementById('brand');
+  const bodySel = document.getElementById('body');
+  const search = document.getElementById('search');
+  const yearMin = document.getElementById('yearMin');
+  const grid = document.getElementById('grid');
+  const countEl = document.getElementById('count');
+
+  // Populate brand and body selects from data
+  const brands = [...new Set(models.map(m => m.brand))].sort();
+  for (const b of brands) {
+    const o = document.createElement('option');
+    o.value = b; o.textContent = b;
+    brandSel.appendChild(o);
+  }
+  const bodies = [...new Set(models.flatMap(m => m.body_types || []))].sort();
+  for (const b of bodies) {
+    const o = document.createElement('option');
+    o.value = b; o.textContent = b;
+    bodySel.appendChild(o);
+  }
+
+  function render() {
+    const q = search.value.trim().toLowerCase();
+    const brand = brandSel.value;
+    const body = bodySel.value;
+    const yMin = parseInt(yearMin.value, 10);
+
+    const filtered = models.filter(m => {
+      if (brand && m.brand !== brand) return false;
+      if (body && !(m.body_types || []).includes(body)) return false;
+      if (q && !(m.model + ' ' + m.generation).toLowerCase().includes(q)) return false;
+      if (!isNaN(yMin) && (m.year_to ?? m.year_from ?? 0) < yMin) return false;
+      return true;
+    });
+
+    countEl.textContent = filtered.length + ' / ' + models.length + ' records';
+    grid.innerHTML = '';
+
+    if (filtered.length === 0) {
+      const div = document.createElement('div');
+      div.className = 'empty';
+      div.textContent = 'Нет записей по фильтру';
+      grid.appendChild(div);
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    for (let i = 0; i < filtered.length; i++) {
+      const m = filtered[i];
+      const card = document.createElement('button');
+      card.className = 'card';
+      card.type = 'button';
+      card.dataset.recordIndex = String(models.indexOf(m));
+      card.setAttribute('aria-label', m.brand + ' ' + m.model + ' ' + m.generation);
+
+      const imgPath = (m.image_paths && m.image_paths[0]) || null;
+      if (imgPath) {
+        const img = document.createElement('img');
+        img.className = 'thumb';
+        img.src = imgPath;
+        img.loading = 'lazy';
+        img.alt = m.brand + ' ' + m.model;
+        img.onerror = () => { img.replaceWith(noImage()); };
+        card.appendChild(img);
+      } else {
+        card.appendChild(noImage());
+      }
+
+      const body = document.createElement('div');
+      body.className = 'card-body';
+
+      const priceSummary = formatPrice(m.price_min_rub, m.price_max_rub);
+      const bodyBadges = (m.body_types || []).map(b => '<span class="badge">' + esc(b) + '</span>').join(' ');
+      const priceBadge = priceSummary ? '<span class="price-pill">' + esc(priceSummary) + '</span>' : '';
+
+      body.innerHTML = '<div class="brand">' + esc(m.brand) + '</div>'
+        + '<div class="model">' + esc(m.model) + '</div>'
+        + '<div class="generation">' + esc(m.generation) + ' · '
+          + esc(m.year_from || '?') + '–' + esc(m.year_to || 'н.в.') + '</div>'
+        + '<div class="meta">' + bodyBadges + (priceBadge ? ' ' + priceBadge : '') + '</div>'
+        + (m.description_ru ? '<div class="desc">' + esc(m.description_ru) + '</div>' : '');
+      card.appendChild(body);
+
+      card.addEventListener('click', () => openModal(m));
+      fragment.appendChild(card);
+    }
+    grid.appendChild(fragment);
+  }
+
+  // ---- Modal / details panel ----
+  const modal = document.getElementById('modal');
+  const modalContent = document.getElementById('modal-content');
+
+  function openModal(m) {
+    modalContent.innerHTML = renderModalBody(m);
+    modal.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    // Focus the close button for keyboard users
+    const closeBtn = modalContent.querySelector('.modal-close');
+    if (closeBtn) closeBtn.focus();
+  }
+
+  function closeModal() {
+    modal.classList.remove('open');
+    document.body.style.overflow = '';
+    modalContent.innerHTML = '';
+  }
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal.classList.contains('open')) closeModal();
+  });
+
+  function renderModalBody(m) {
+    const heroImg = (m.image_paths && m.image_paths[0]) || null;
+    const gallery = (m.image_paths || []).slice(1);
+    const priceSummary = formatPrice(m.price_min_rub, m.price_max_rub);
+
+    let html = '<button class="modal-close" aria-label="Закрыть" onclick="document.getElementById(\\'modal\\').classList.remove(\\'open\\'); document.body.style.overflow=\\'\\'; document.getElementById(\\'modal-content\\').innerHTML=\\'\\';">×</button>';
+
+    if (heroImg) {
+      html += '<img class="modal-hero" src="' + esc(heroImg) + '" alt="' + esc(m.brand + ' ' + m.model) + '" onerror="this.style.display=\\'none\\'">';
+    }
+
+    html += '<div class="modal-body">';
+    html += '<div class="modal-brand">' + esc(m.brand) + '</div>';
+    html += '<h2 class="modal-title" id="modal-title">' + esc(m.model) + '</h2>';
+    html += '<div class="modal-subtitle">' + esc(m.generation) + ' · '
+      + esc(m.year_from || '?') + '–' + esc(m.year_to || 'н.в.') + '</div>';
+
+    // Body types + price as badges
+    const badges = (m.body_types || []).map(b => '<span class="badge">' + esc(b) + '</span>');
+    if (priceSummary) badges.push('<span class="price-pill">' + esc(priceSummary) + '</span>');
+    if (badges.length) {
+      html += '<div class="modal-section badges-row">' + badges.join(' ') + '</div>';
+    }
+
+    // Description (full)
+    if (m.description_ru) {
+      html += '<div class="modal-section"><h3>Описание</h3><div class="desc-full">' + esc(m.description_ru) + '</div></div>';
+    }
+
+    // Engine options
+    if (m.engine_options && m.engine_options.length) {
+      html += '<div class="modal-section"><h3>Двигатели (' + m.engine_options.length + ')</h3><dl class="kv">';
+      for (const e of m.engine_options) {
+        const label = [e.fuel, e.volume_l ? e.volume_l + ' л' : '', e.power_hp ? e.power_hp + ' л.с.' : '', e.transmission]
+          .filter(Boolean).join(' · ');
+        html += '<dt>' + esc(e.label || '') + '</dt><dd>' + esc(label || '—') + '</dd>';
+      }
+      html += '</dl></div>';
+    }
+
+    // Drive options
+    if (m.drive_options && m.drive_options.length) {
+      html += '<div class="modal-section"><h3>Привод</h3><div class="badges-row">'
+        + m.drive_options.map(d => '<span class="badge">' + esc(d) + '</span>').join(' ')
+        + '</div></div>';
+    }
+
+    // Identity / metadata table
+    html += '<div class="modal-section"><h3>Метаданные</h3><dl class="kv">'
+      + '<dt>brand_slug</dt><dd>' + esc(m.brand_slug) + '</dd>'
+      + '<dt>model_slug</dt><dd>' + esc(m.model_slug) + '</dd>'
+      + '<dt>generation</dt><dd>' + esc(m.generation) + '</dd>'
+      + '<dt>source</dt><dd>' + esc(m.source) + '</dd>'
+      + (m.source_url ? '<dt>source_url</dt><dd><a href="' + esc(m.source_url) + '" target="_blank" rel="noopener">' + esc(m.source_url) + '</a></dd>' : '')
+      + '<dt>scraped_at</dt><dd>' + esc(m.scraped_at) + '</dd>'
+      + (m.image_paths ? '<dt>image_paths</dt><dd>' + (m.image_paths.length || 0) + ' file(s)</dd>' : '')
+      + '</dl></div>';
+
+    // Image gallery (if more than the hero)
+    if (gallery.length) {
+      html += '<div class="modal-section"><h3>Дополнительные изображения (' + gallery.length + ')</h3><div class="gallery">';
+      for (const p of gallery) {
+        html += '<img src="' + esc(p) + '" loading="lazy" alt="" onerror="this.style.opacity=0.2">';
+      }
+      html += '</div></div>';
+    }
+
+    if (m.source_url) {
+      html += '<a class="source-link" href="' + esc(m.source_url) + '" target="_blank" rel="noopener">↗ Открыть на drom.ru</a>';
+    }
+
+    html += '</div>';
+    return html;
+  }
+
+  function formatPrice(min, max) {
+    if (min == null && max == null) return null;
+    const fmt = n => Number(n).toLocaleString('ru-RU') + ' ₽';
+    if (min != null && max != null && min !== max) return fmt(min) + ' – ' + fmt(max);
+    return fmt(min ?? max);
+  }
+
+  function noImage() {
+    const d = document.createElement('div');
+    d.className = 'thumb';
+    d.textContent = 'без изображения';
+    return d;
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  search.addEventListener('input', render);
+  brandSel.addEventListener('change', render);
+  bodySel.addEventListener('change', render);
+  yearMin.addEventListener('input', render);
+  render();
+</script>
+</body>
+</html>
+`;
+}
+
+function escapeHtml(s: string): string {
+  return String(s).replace(/[&<>"']/g, (c) => {
+    const map: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    };
+    return map[c]!;
+  });
+}
+
+function escapeAttr(s: string): string {
+  return String(s).replace(/[^a-z0-9_-]/gi, '');
+}
+
+function formatDuration(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const r = s % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${r}s`;
+  return `${r}s`;
+}
+
+function formatDate(iso: string): string {
+  if (!iso) return '—';
+  return new Date(iso).toISOString().replace('T', ' ').replace(/\..+$/, ' UTC');
+}
