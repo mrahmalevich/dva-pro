@@ -43,6 +43,7 @@ The terminology distinction matters: **drom outputs MASTER MODELS** (one row per
 | `source` | `'drom-catalog'` (literal) | yes | Always this exact string for Phase 1 |
 | `source_url` | `string` (URL) | yes | Drom generation page URL |
 | `scraped_at` | `string` (ISO-8601) | yes | UTC timestamp of when the record was parsed |
+| `complectations` | `Complectation[]` | Yes (default `[]`) | Per-trim records nested under each generation; populated for BMW only in Phase 01.1; legacy records lacking this field load with default `[]` for backward-compat |
 
 ### Worked example — BMW X5 G05
 
@@ -70,6 +71,80 @@ The terminology distinction matters: **drom outputs MASTER MODELS** (one row per
   "scraped_at": "2026-04-28T12:00:00.000Z"
 }
 ```
+
+---
+
+## Complectation (Phase 01.1)
+
+Each `ModelRecord.complectations[]` entry is a `Complectation` record. Per the per-comp parser's fail-soft contract (SPEC R-6), every leaf field is nullable; failures emit `null` plus an optional `_extraction_errors[]` annotation.
+
+### Identity (7 leaves; threshold ≥ 5 non-null per trim)
+
+| Field | Type | Notes |
+|-------|------|-------|
+| name | string \| null | Trim name from generation page (e.g., 'xDrive 30d AT Base') |
+| period_from | string \| null | Production start (MM.YYYY) |
+| period_to | string \| null | Production end (MM.YYYY) |
+| tier | 'Базовая' \| 'Предмаксимальная' \| 'Максимальная' \| null | Drom tier label; null on top trims (e.g., M Competition) |
+| engine_code | string \| null | Manufacturer engine code (e.g., 'B47B20') |
+| frame_code | string \| null | Drom frame/chassis code (e.g., 'G05') |
+| source_url | string (URL) \| null | Canonical /catalog/<brand>/<model>/<comp_id>/ URL |
+
+### Pricing (2 leaves; threshold ≥ 2 — all)
+
+| Field | Type | Notes |
+|-------|------|-------|
+| price_new_rub | number \| null | New-car price in RUB |
+| price_used_from_rub | number \| null | "Цена б/у: от X ₽" parsed value; sparse — null on most trims |
+
+### Drivetrain (6 leaves; threshold ≥ 4 non-null)
+
+| Field | Type | Notes |
+|-------|------|-------|
+| engine_cc | integer \| null | From parent generation's engine_options[0].cc |
+| engine_hp | integer \| null | From parent generation's engine_options[0].hp |
+| engine_fuel | 'gas' \| 'diesel' \| 'hybrid' \| 'electric' \| null | From parent generation |
+| drive | string \| null | From parent generation's drive_options[0] |
+| transmission_type | 'AT' \| 'MT' \| 'CVT' \| 'AMT' \| null | Derived from trim name regex |
+| transmission_gears | integer \| null | From per-comp page label "Количество передач" |
+
+### Dimensions (9 leaves; threshold ≥ 6 non-null)
+
+| Field | Type | Notes |
+|-------|------|-------|
+| length_mm | number \| null | "Длина, мм" |
+| width_mm | number \| null | "Ширина, мм" |
+| height_mm | number \| null | "Высота, мм" |
+| wheelbase_mm | number \| null | "Колесная база, мм" |
+| clearance_mm | number \| null | "Дорожный просвет, мм" |
+| trunk_min_l | number \| null | First number of "Объем багажника, л: X (Y)" |
+| trunk_max_l | number \| null | Second number of "Объем багажника, л: X (Y)" — null when only one number present |
+| curb_weight_kg | number \| null | "Снаряженная масса, кг" |
+| gross_weight_kg | number \| null | "Максимальная допустимая масса, кг" |
+
+### Comfort (6 leaves; threshold ≥ 4 non-null)
+
+| Field | Type | Notes |
+|-------|------|-------|
+| seats | integer \| null | "Количество мест" |
+| doors | integer \| null | "Количество дверей" |
+| fuel_consumption_city_l | number \| null | "В городском цикле, л/100 км" |
+| fuel_consumption_highway_l | number \| null | "На трассе, л/100 км" |
+| fuel_consumption_combined_l | number \| null | "В смешанном цикле, л/100 км" |
+| tank_l | number \| null | "Объем топливного бака, л" |
+
+### Tires (2 leaves; threshold ≥ 2 — all)
+
+| Field | Type | Notes |
+|-------|------|-------|
+| tires_front | string \| null | "Передние шины" raw spec string (e.g., '275/45 R20 110Y'); structured parsing deferred to v1.x |
+| tires_rear | string \| null | "Задние шины" raw spec string |
+
+### Annotation
+
+| Field | Type | Notes |
+|-------|------|-------|
+| _extraction_errors | { group: string; message: string }[] (optional) | Telemetry annotation; lists per-group extraction failures. Phase 03 importer treats as informational only. |
 
 ---
 
@@ -110,6 +185,7 @@ Every drom run writes `report.json` with these fields (D-17):
 | `fx_stale` | boolean | `true` if `fetchFx` returned `source: 'cbr-cache'` (live failed; cached fallback used per D-12) |
 | `cursor_resumed` | boolean | `true` if `.cursor.json` was read at run start |
 | `final_status` | `'ok' \| 'blocked' \| 'error'` | Mirrors the `ScrapeResult.status` returned by the orchestrator |
+| `field_coverage` | `{ identity: number; pricing: number; drivetrain: number; dimensions: number; comfort: number; tires: number }` (optional) | Per-group coverage rates rounded to 2 dp. Present only on `final_status: 'ok'` runs. Each rate is the fraction of trims meeting the D-06 threshold for that group. SPEC R-7 gate: every rate must be ≥ 0.70 for the run to succeed. |
 
 ---
 
