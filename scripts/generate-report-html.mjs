@@ -90,9 +90,12 @@ const html = `<!DOCTYPE html>
   .card {
     background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
     overflow: hidden; display: flex; flex-direction: column;
-    transition: border-color 120ms ease;
+    transition: border-color 120ms ease, transform 120ms ease;
+    cursor: pointer; text-align: left; font: inherit; color: inherit;
+    padding: 0; width: 100%;
   }
-  .card:hover { border-color: var(--accent); }
+  .card:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .thumb {
     width: 100%; aspect-ratio: 4/3; background: #000;
     display: flex; align-items: center; justify-content: center; color: var(--muted);
@@ -107,9 +110,8 @@ const html = `<!DOCTYPE html>
     background: rgba(88, 166, 255, 0.1); color: var(--accent);
     padding: 2px 8px; border-radius: 12px; font-size: 11px;
   }
-  .desc { font-size: 12px; color: var(--muted); margin-top: 8px; max-height: 60px; overflow: hidden; text-overflow: ellipsis; }
-  .source { display: block; padding: 8px 14px; border-top: 1px solid var(--border); font-size: 12px; color: var(--accent); text-decoration: none; }
-  .source:hover { background: rgba(88, 166, 255, 0.05); }
+  .desc { font-size: 12px; color: var(--muted); margin-top: 8px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .price-pill { background: rgba(63,185,80,0.12); color: var(--ok); padding: 2px 8px; border-radius: 12px; font-size: 11px; }
   .empty { color: var(--muted); padding: 40px; text-align: center; grid-column: 1 / -1; }
   .count { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
   .errors {
@@ -117,6 +119,62 @@ const html = `<!DOCTYPE html>
     border-radius: 8px; padding: 12px 16px; margin-top: 12px; font-size: 12px;
     font-family: ui-monospace, monospace; white-space: pre-wrap;
   }
+  /* Modal / details overlay */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    display: none; align-items: flex-start; justify-content: center;
+    z-index: 1000; padding: 24px; overflow-y: auto;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    width: 100%; max-width: 920px; max-height: calc(100vh - 48px);
+    overflow-y: auto; position: relative;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .modal-close {
+    position: sticky; top: 0; float: right;
+    background: var(--panel); color: var(--muted);
+    border: 1px solid var(--border); border-radius: 50%;
+    width: 32px; height: 32px; font-size: 18px; line-height: 1;
+    cursor: pointer; margin: 12px; z-index: 1;
+  }
+  .modal-close:hover { color: var(--fg); border-color: var(--accent); }
+  .modal-hero {
+    width: 100%; max-height: 50vh; object-fit: contain;
+    background: #000; display: block;
+  }
+  .modal-body { padding: 24px 28px 28px; }
+  .modal-brand { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .modal-title { font-size: 24px; font-weight: 600; margin: 4px 0 4px; }
+  .modal-subtitle { color: var(--muted); font-family: ui-monospace, SFMono-Regular, monospace; font-size: 13px; margin-bottom: 16px; }
+  .modal-section { margin-top: 20px; }
+  .modal-section h3 {
+    color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+    margin: 0 0 8px; font-weight: 500;
+  }
+  .modal-section p, .modal-section .desc-full { margin: 0; font-size: 14px; line-height: 1.55; }
+  .modal-section .desc-full { white-space: pre-wrap; word-break: break-word; }
+  .kv {
+    display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px;
+    font-size: 13px; align-items: baseline;
+  }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; font-family: ui-monospace, monospace; word-break: break-all; }
+  .kv dd a { color: var(--accent); text-decoration: none; }
+  .kv dd a:hover { text-decoration: underline; }
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+  .gallery img {
+    width: 100%; aspect-ratio: 4/3; object-fit: cover;
+    border: 1px solid var(--border); border-radius: 6px; background: #000;
+  }
+  .badges-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .modal a.source-link {
+    display: inline-block; padding: 8px 16px; margin-top: 16px;
+    background: rgba(88,166,255,0.1); color: var(--accent);
+    border-radius: 6px; font-size: 13px; text-decoration: none;
+  }
+  .modal a.source-link:hover { background: rgba(88,166,255,0.2); }
 </style>
 </head>
 <body>
@@ -157,6 +215,10 @@ const html = `<!DOCTYPE html>
 
 <div class="count" id="count"></div>
 <div class="grid" id="grid"></div>
+
+<div class="modal-backdrop" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="modal" id="modal-content"></div>
+</div>
 
 <script type="application/json" id="data">${JSON.stringify({ models, runId }).replace(/</g, '\\u003c')}</script>
 <script>
@@ -210,9 +272,13 @@ const html = `<!DOCTYPE html>
     }
 
     const fragment = document.createDocumentFragment();
-    for (const m of filtered) {
-      const card = document.createElement('div');
+    for (let i = 0; i < filtered.length; i++) {
+      const m = filtered[i];
+      const card = document.createElement('button');
       card.className = 'card';
+      card.type = 'button';
+      card.dataset.recordIndex = String(models.indexOf(m));
+      card.setAttribute('aria-label', m.brand + ' ' + m.model + ' ' + m.generation);
 
       const imgPath = (m.image_paths && m.image_paths[0]) || null;
       if (imgPath) {
@@ -229,29 +295,131 @@ const html = `<!DOCTYPE html>
 
       const body = document.createElement('div');
       body.className = 'card-body';
+
+      const priceSummary = formatPrice(m.price_min_rub, m.price_max_rub);
+      const bodyBadges = (m.body_types || []).map(b => '<span class="badge">' + esc(b) + '</span>').join(' ');
+      const priceBadge = priceSummary ? '<span class="price-pill">' + esc(priceSummary) + '</span>' : '';
+
       body.innerHTML = '<div class="brand">' + esc(m.brand) + '</div>'
         + '<div class="model">' + esc(m.model) + '</div>'
         + '<div class="generation">' + esc(m.generation) + ' · '
           + esc(m.year_from || '?') + '–' + esc(m.year_to || 'н.в.') + '</div>'
-        + '<div class="meta">'
-          + (m.body_types || []).map(b => '<span class="badge">' + esc(b) + '</span>').join(' ')
-        + '</div>'
-        + (m.description_ru ? '<div class="desc">' + esc(m.description_ru.slice(0, 200)) + '</div>' : '');
+        + '<div class="meta">' + bodyBadges + (priceBadge ? ' ' + priceBadge : '') + '</div>'
+        + (m.description_ru ? '<div class="desc">' + esc(m.description_ru) + '</div>' : '');
       card.appendChild(body);
 
-      if (m.source_url) {
-        const a = document.createElement('a');
-        a.className = 'source';
-        a.href = m.source_url;
-        a.target = '_blank';
-        a.rel = 'noopener';
-        a.textContent = '↗ открыть на drom.ru';
-        card.appendChild(a);
-      }
-
+      card.addEventListener('click', () => openModal(m));
       fragment.appendChild(card);
     }
     grid.appendChild(fragment);
+  }
+
+  // ---- Modal / details panel ----
+  const modal = document.getElementById('modal');
+  const modalContent = document.getElementById('modal-content');
+
+  function openModal(m) {
+    modalContent.innerHTML = renderModalBody(m);
+    modal.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    // Focus the close button for keyboard users
+    const closeBtn = modalContent.querySelector('.modal-close');
+    if (closeBtn) closeBtn.focus();
+  }
+
+  function closeModal() {
+    modal.classList.remove('open');
+    document.body.style.overflow = '';
+    modalContent.innerHTML = '';
+  }
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal.classList.contains('open')) closeModal();
+  });
+
+  function renderModalBody(m) {
+    const heroImg = (m.image_paths && m.image_paths[0]) || null;
+    const gallery = (m.image_paths || []).slice(1);
+    const priceSummary = formatPrice(m.price_min_rub, m.price_max_rub);
+
+    let html = '<button class="modal-close" aria-label="Закрыть" onclick="document.getElementById(\\'modal\\').classList.remove(\\'open\\'); document.body.style.overflow=\\'\\'; document.getElementById(\\'modal-content\\').innerHTML=\\'\\';">×</button>';
+
+    if (heroImg) {
+      html += '<img class="modal-hero" src="' + esc(heroImg) + '" alt="' + esc(m.brand + ' ' + m.model) + '" onerror="this.style.display=\\'none\\'">';
+    }
+
+    html += '<div class="modal-body">';
+    html += '<div class="modal-brand">' + esc(m.brand) + '</div>';
+    html += '<h2 class="modal-title" id="modal-title">' + esc(m.model) + '</h2>';
+    html += '<div class="modal-subtitle">' + esc(m.generation) + ' · '
+      + esc(m.year_from || '?') + '–' + esc(m.year_to || 'н.в.') + '</div>';
+
+    // Body types + price as badges
+    const badges = (m.body_types || []).map(b => '<span class="badge">' + esc(b) + '</span>');
+    if (priceSummary) badges.push('<span class="price-pill">' + esc(priceSummary) + '</span>');
+    if (badges.length) {
+      html += '<div class="modal-section badges-row">' + badges.join(' ') + '</div>';
+    }
+
+    // Description (full)
+    if (m.description_ru) {
+      html += '<div class="modal-section"><h3>Описание</h3><div class="desc-full">' + esc(m.description_ru) + '</div></div>';
+    }
+
+    // Engine options
+    if (m.engine_options && m.engine_options.length) {
+      html += '<div class="modal-section"><h3>Двигатели (' + m.engine_options.length + ')</h3><dl class="kv">';
+      for (const e of m.engine_options) {
+        const label = [e.fuel, e.volume_l ? e.volume_l + ' л' : '', e.power_hp ? e.power_hp + ' л.с.' : '', e.transmission]
+          .filter(Boolean).join(' · ');
+        html += '<dt>' + esc(e.label || '') + '</dt><dd>' + esc(label || '—') + '</dd>';
+      }
+      html += '</dl></div>';
+    }
+
+    // Drive options
+    if (m.drive_options && m.drive_options.length) {
+      html += '<div class="modal-section"><h3>Привод</h3><div class="badges-row">'
+        + m.drive_options.map(d => '<span class="badge">' + esc(d) + '</span>').join(' ')
+        + '</div></div>';
+    }
+
+    // Identity / metadata table
+    html += '<div class="modal-section"><h3>Метаданные</h3><dl class="kv">'
+      + '<dt>brand_slug</dt><dd>' + esc(m.brand_slug) + '</dd>'
+      + '<dt>model_slug</dt><dd>' + esc(m.model_slug) + '</dd>'
+      + '<dt>generation</dt><dd>' + esc(m.generation) + '</dd>'
+      + '<dt>source</dt><dd>' + esc(m.source) + '</dd>'
+      + (m.source_url ? '<dt>source_url</dt><dd><a href="' + esc(m.source_url) + '" target="_blank" rel="noopener">' + esc(m.source_url) + '</a></dd>' : '')
+      + '<dt>scraped_at</dt><dd>' + esc(m.scraped_at) + '</dd>'
+      + (m.image_paths ? '<dt>image_paths</dt><dd>' + (m.image_paths.length || 0) + ' file(s)</dd>' : '')
+      + '</dl></div>';
+
+    // Image gallery (if more than the hero)
+    if (gallery.length) {
+      html += '<div class="modal-section"><h3>Дополнительные изображения (' + gallery.length + ')</h3><div class="gallery">';
+      for (const p of gallery) {
+        html += '<img src="' + esc(p) + '" loading="lazy" alt="" onerror="this.style.opacity=0.2">';
+      }
+      html += '</div></div>';
+    }
+
+    if (m.source_url) {
+      html += '<a class="source-link" href="' + esc(m.source_url) + '" target="_blank" rel="noopener">↗ Открыть на drom.ru</a>';
+    }
+
+    html += '</div>';
+    return html;
+  }
+
+  function formatPrice(min, max) {
+    if (min == null && max == null) return null;
+    const fmt = n => Number(n).toLocaleString('ru-RU') + ' ₽';
+    if (min != null && max != null && min !== max) return fmt(min) + ' – ' + fmt(max);
+    return fmt(min ?? max);
   }
 
   function noImage() {
