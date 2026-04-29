@@ -113,6 +113,22 @@ Every drom run writes `report.json` with these fields (D-17):
 
 ---
 
+## Report viewer (`index.html`)
+
+A self-contained HTML viewer is auto-emitted at `data/scraped/drom/<run_id>/index.html` after every run (success / blocked / error). It is **non-canonical** — fully regeneratable from `models.json` + `report.json` via:
+
+```bash
+pnpm exec tsx scripts/generate-report-html.mjs data/scraped/drom/<run_id>
+```
+
+`index.html` is gitignored and is NOT part of the Phase 3 importer contract — the importer reads `models.json` (canonical) and ignores `index.html`. The viewer exists for operator workflows only.
+
+The single source of truth for the rendering logic is `server/scrapers/shared/report-html.ts` (function `writeReportHtml(runDir, opts?)`). Both the drom orchestrator and the standalone CLI (`scripts/generate-report-html.mjs`) call into it; neither duplicates HTML logic.
+
+See `data/scraped/README.md` §"Report viewer (`index.html`)" for usage details.
+
+---
+
 ## Brand-aliases — `data/scraped/drom/brand-aliases.json`
 
 Cyrillic↔Latin lookup, idempotent merge by `brand_slug` (D-16, SCRAPE-10):
