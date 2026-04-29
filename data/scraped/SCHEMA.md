@@ -22,6 +22,8 @@ The terminology distinction matters: **drom outputs MASTER MODELS** (one row per
 
 **Uniqueness key for Phase 3 upsert:** `(brand_slug, model_slug, generation)`. This matches `models.UNIQUE` in `.planning/research/ARCHITECTURE.md:555`.
 
+**Incremental snapshot semantics (D-19):** every successful run inherits the previous `current/` snapshot — both `models.json` records (keyed by the upsert tuple above) and `images/*.webp` — into the new run dir before scraping starts. New scrape data UPSERTS into the inherited set. Records present in the previous snapshot but NOT re-scraped this run are preserved verbatim. This guarantees that scoped runs (e.g. `DROM_BRAND_WHITELIST=lada`) do not destroy data from other brands. To start fresh, manually delete the `current/` symlink before invoking the orchestrator.
+
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
 | `brand` | `string` | yes | Display name (Cyrillic preferred where drom exposes it; otherwise Latin), e.g. `BMW` |
@@ -98,10 +100,10 @@ Every drom run writes `report.json` with these fields (D-17):
 | `finished_at` | ISO-8601 | When the run terminated (success / blocked / error) |
 | `duration_ms` | number | `finished_at - started_at` in ms |
 | `pages_visited` | number | Total drom HTTP fetches (brand index + model lists + generation lists + generation pages) |
-| `models_added` | number | Records that passed zod validation and were written to `models.json` |
-| `models_updated` | number | Always `0` in Phase 1 (no upsert); placeholder for Phase 3 importer parity |
-| `images_downloaded` | number | WebP files written under `images/` |
-| `images_skipped` | number | Records with no hero or with image-fetch failure |
+| `models_added` | number | Records this run produced whose `(brand_slug, model_slug, generation)` did NOT exist in the previous `current/` snapshot |
+| `models_updated` | number | Records this run produced whose key DID exist in the previous `current/` snapshot (re-scraped, replacing the inherited record). `0` on the first-ever run since there is no prev snapshot to update against. |
+| `images_downloaded` | number | WebP files newly written to `images/` via the network |
+| `images_skipped` | number | Hero-image events that did not download — covers (a) record had no hero URL, (b) image was inherited from prev `current/images/` and is already on disk, (c) fetch failed (also recorded in `errors[]`) |
 | `errors[]` | `{url, message}[]` | Per-record parse / image-fetch failures (NOT fatal — run continues) |
 | `rate_limit_hits` | number | Reserved for Phase 1.x — Phase 1 does not currently surface 429s into this counter |
 | `blocked_responses` | number | Increments on `BlockedError` (5+ thin OR captcha keyword); run halts when this hits 1 |

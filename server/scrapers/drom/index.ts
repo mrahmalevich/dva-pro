@@ -31,6 +31,8 @@
 // Behavioral contract per PATTERNS.md §drom orchestrator (lines 1037-1054).
 
 import { resolve } from 'node:path';
+import { existsSync, readlinkSync, readdirSync } from 'node:fs';
+import { copyFile, mkdir, readFile } from 'node:fs/promises';
 import { fetchHtml } from '../shared/http.js';
 import { fetchFx } from '../shared/fx.js';
 import { downloadAndConvert } from '../shared/images.js';
@@ -62,6 +64,105 @@ function makeRunId(now: Date = new Date()): string {
   return now.toISOString().replace(/[:.]/g, '-').replace(/-\d{3}Z$/, 'Z');
 }
 
+/**
+ * Incremental run support: read the previous `current/` snapshot (if any) and
+ * pre-populate the new run's working set. Without this, a re-run scoped to a
+ * subset of brands (e.g. DROM_BRAND_WHITELIST=lada after a full backfill) would
+ * silently drop every other brand from the new `current/models.json`.
+ *
+ * Behavior:
+ *   - If `current/` does not exist (first-ever run), returns empty state.
+ *   - If `current/` exists, reads `models.json` into a Map keyed by
+ *     `${brand_slug}:${model_slug}:${generation}` and copies every WebP under
+ *     `current/images/` into `<newRunDir>/images/`. The new run will then
+ *     UPSERT records into `seen` and SKIP image download for any image that
+ *     was inherited (file already exists on disk).
+ *
+ * Robust to: missing models.json, malformed JSON, broken symlink, missing
+ * images dir. Any inheritance failure logs to the report's error list and
+ * starts the run with empty state — the prev `current/` snapshot is never
+ * touched, so the operator can fall back manually.
+ */
+async function inheritFromPrevCurrent(
+  runRoot: string,
+  newRunDir: string,
+  report: ReportSummary,
+): Promise<{
+  seen: Map<string, ModelRecord>;
+  inheritedImageCount: number;
+  prevRunId: string | null;
+}> {
+  const seen = new Map<string, ModelRecord>();
+  const currentSymlink = resolve(runRoot, 'current');
+  if (!existsSync(currentSymlink)) {
+    return { seen, inheritedImageCount: 0, prevRunId: null };
+  }
+
+  let prevRunId: string | null = null;
+  try {
+    prevRunId = readlinkSync(currentSymlink);
+  } catch {
+    return { seen, inheritedImageCount: 0, prevRunId: null };
+  }
+  const prevDir = resolve(runRoot, prevRunId);
+  if (!existsSync(prevDir)) {
+    return { seen, inheritedImageCount: 0, prevRunId: null };
+  }
+
+  // 1. Inherit records from prev models.json.
+  const prevModelsPath = resolve(prevDir, 'models.json');
+  if (existsSync(prevModelsPath)) {
+    try {
+      const raw = await readFile(prevModelsPath, 'utf-8');
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) {
+        for (const r of arr as ModelRecord[]) {
+          if (r && r.brand_slug && r.model_slug && r.generation) {
+            seen.set(`${r.brand_slug}:${r.model_slug}:${r.generation}`, r);
+          }
+        }
+      }
+    } catch (err) {
+      report.errors.push({
+        url: prevModelsPath,
+        message: `inherit: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
+  }
+
+  // 2. Copy prev images/ into the new run dir so they are part of the new
+  //    snapshot. Skipped image downloads in the loop will then no-op against
+  //    on-disk files. fs.copyFile on Linux+macOS is fast (cp internally uses
+  //    clonefile/reflink where supported) and portable to Windows.
+  const prevImages = resolve(prevDir, 'images');
+  let inheritedImageCount = 0;
+  if (existsSync(prevImages)) {
+    await mkdir(resolve(newRunDir, 'images'), { recursive: true });
+    let entries: string[] = [];
+    try {
+      entries = readdirSync(prevImages);
+    } catch {
+      entries = [];
+    }
+    for (const entry of entries) {
+      if (!entry.endsWith('.webp')) continue;
+      const src = resolve(prevImages, entry);
+      const dst = resolve(newRunDir, 'images', entry);
+      try {
+        await copyFile(src, dst);
+        inheritedImageCount++;
+      } catch (err) {
+        report.errors.push({
+          url: src,
+          message: `inherit-image: ${err instanceof Error ? err.message : String(err)}`,
+        });
+      }
+    }
+  }
+
+  return { seen, inheritedImageCount, prevRunId };
+}
+
 function emptyReport(startedAt: string): ReportSummary {
   return {
     started_at: startedAt,
@@ -91,7 +192,24 @@ export const drom: IScraper = {
     const brandAliasesPath = resolve(runRoot, 'brand-aliases.json');
     const detector = new BlockDetector();
     const report: ReportSummary = emptyReport(startedAt);
-    const records: ModelRecord[] = [];
+
+    // Incremental snapshot: pull forward records and images from the previous
+    // `current/` so a scoped re-run (e.g. DROM_BRAND_WHITELIST=lada) does not
+    // delete data from other brands. `seen` is keyed by upsert key per
+    // SCHEMA.md §"Phase 3 importer contract" — `(brand_slug, model_slug, generation)`.
+    await mkdir(runDir, { recursive: true });
+    const { seen, inheritedImageCount, prevRunId } = await inheritFromPrevCurrent(
+      runRoot,
+      runDir,
+      report,
+    );
+    // Track which records were inherited (vs. produced by this run) so the
+    // add/update counters reflect THIS run's work, not the merged snapshot.
+    const inheritedKeys = new Set<string>(seen.keys());
+    // Track per-run "models touched" separately from the merged total — used
+    // for the >10% Pitfall-1 validation cap below.
+    let modelsTouchedThisRun = 0;
+    void prevRunId; // reserved for future report.json field; suppressed for now
 
     let cursor: Cursor | null = null;
     if (opts.resume) {
@@ -103,6 +221,7 @@ export const drom: IScraper = {
       // 1. FX feed first — fail-fast if no cache exists yet (D-12).
       const fx = await fetchFx({ firstRun: !cursor });
       report.fx_stale = fx.source === 'cbr-cache';
+      void inheritedImageCount; // reserved for future report.json field
 
       // 2. Brand index.
       const brandIndexHtml = await fetchHtml(BRAND_INDEX_URL);
@@ -173,13 +292,25 @@ export const drom: IScraper = {
                 generation: gen.generation_id,
                 sourceUrl: gen.url,
               });
-              records.push(record);
-              report.models_added++;
+              const key = `${record.brand_slug}:${record.model_slug}:${record.generation}`;
+              if (inheritedKeys.has(key)) {
+                report.models_updated++;
+              } else {
+                report.models_added++;
+              }
+              seen.set(key, record);
+              modelsTouchedThisRun++;
 
               // 6. Hero image download (sequenced via shared/images.ts pLimit(4)).
-              if (gen.hero_image_url && record.image_paths.length > 0) {
+              //    If the image was already inherited from prev current/, the
+              //    target file exists on disk — skip the network call.
+              const heroRel = record.image_paths[0];
+              const heroAbs = heroRel ? resolve(runDir, heroRel) : null;
+              if (heroAbs && existsSync(heroAbs)) {
+                report.images_skipped++;
+              } else if (gen.hero_image_url && heroRel) {
                 try {
-                  await downloadAndConvert(gen.hero_image_url, record.image_paths[0], runDir);
+                  await downloadAndConvert(gen.hero_image_url, heroRel, runDir);
                   report.images_downloaded++;
                 } catch (imgErr) {
                   report.images_skipped++;
@@ -216,21 +347,29 @@ export const drom: IScraper = {
         await mergeAliases(brandAliasesPath, { [brand.brand_slug]: brandEntry });
       }
 
-      // Pitfall 1: if >10 % of attempted records failed validation, treat as DOM regression.
-      const totalAttempted = report.models_added + report.errors.length;
+      // Pitfall 1: if >10 % of THIS RUN's attempted records failed validation,
+      // treat as DOM regression. Inherited records from prev current/ are
+      // excluded from the denominator — they are not "attempted" by this run.
+      const totalAttempted = modelsTouchedThisRun + report.errors.length;
       if (totalAttempted > 0 && report.errors.length / totalAttempted > 0.1) {
         throw new Error(
           `Validation drop-out > 10% (${report.errors.length} of ${totalAttempted}); likely DOM regression`,
         );
       }
 
-      // 7. Write artifacts atomically.
+      // 7. Write artifacts atomically. models.json is the merged snapshot:
+      //    [...inherited records from prev current/] ∪ [...records produced
+      //    or updated by this run].
       const finishedAt = new Date().toISOString();
       report.finished_at = finishedAt;
       report.duration_ms = Date.now() - new Date(startedAt).getTime();
       report.final_status = 'ok';
 
-      await atomicWriteFile(resolve(runDir, 'models.json'), JSON.stringify(records, null, 2));
+      const mergedRecords = [...seen.values()];
+      await atomicWriteFile(
+        resolve(runDir, 'models.json'),
+        JSON.stringify(mergedRecords, null, 2),
+      );
       await atomicWriteFile(resolve(runDir, 'report.json'), JSON.stringify(report, null, 2));
       await pointCurrentAt(runDir);
       await deleteCursor(runDir);
@@ -239,7 +378,7 @@ export const drom: IScraper = {
         status: 'ok',
         source: SOURCE,
         runId,
-        recordsWritten: records.length,
+        recordsWritten: mergedRecords.length,
         durationMs: report.duration_ms,
         report,
       };

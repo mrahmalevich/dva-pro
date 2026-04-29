@@ -89,6 +89,24 @@ If the run dies mid-brand, `pnpm scrape:drom` re-launched will:
 2. Worst case: re-fetch ≤ 1 brand's worth of pages (~7 hours wasted at 10 s/req × ~30 pages/model × ~50 models). Brand-boundary granularity is a deliberate trade-off; finer cursors are a Phase 1.x candidate.
 3. On clean completion, `.cursor.json` is deleted.
 
+### Incremental snapshot (UPSERT semantics)
+
+Each successful run **inherits** every record and image from the previous `current/` snapshot before scraping. Within the run, the new data UPSERTS into the inherited set keyed by `(brand_slug, model_slug, generation)` per the SCHEMA.md upsert contract.
+
+Concretely: if you ran a full backfill yesterday (50 brands, 5000 records) and today re-run scoped to LADA only (`DROM_BRAND_WHITELIST=lada`), today's `current/models.json` contains:
+- All 50 brands × 5000 records from yesterday — preserved verbatim
+- LADA's records — re-scraped, replacing yesterday's LADA entries by `(brand_slug, model_slug, generation)`
+- Total: ~5000 records, with LADA refreshed
+
+Images already in the previous `current/images/` are copied forward into the new run dir (via `fs.copyFile`), so the network call for them is skipped — `report.images_skipped` includes "inherited from prev run". `report.images_downloaded` is only newly fetched images.
+
+Counters reflect THIS run's work, not the merged total:
+- `report.models_added` — keys this run produced that did NOT exist in prev current/
+- `report.models_updated` — keys this run produced that DID exist in prev current/ (re-scraped)
+- `result.recordsWritten` — total records in the new `current/models.json` (added + updated + inherited)
+
+To start fresh and discard prior data, manually delete the `current/` symlink (and optionally the old run directories) before invoking `pnpm scrape:drom`.
+
 ---
 
 ## Pruning old runs

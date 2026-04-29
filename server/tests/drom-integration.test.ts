@@ -245,4 +245,140 @@ describe('drom orchestrator (SCRAPE-05, SCRAPE-09 end-to-end)', () => {
     vi.doUnmock('../scrapers/drom/parse-generation-list.js');
     vi.doUnmock('../scrapers/shared/http.js');
   }, 120_000);
+
+  it('preserves inherited records and images from prev current/ (incremental snapshot)', async () => {
+    // Seed a "previous run" directory with one record + one image for a brand
+    // (honda) that this run's whitelist does NOT cover. The run is then scoped
+    // to BMW only via DROM_BRAND_WHITELIST. After completion, current/models.json
+    // must contain BOTH the inherited honda record AND the BMW records produced
+    // by this run; current/images/honda-civic-g_2020_1234-hero.webp must still
+    // exist (copied forward from prev current/).
+    const dromRoot = resolve(workDir, 'data/scraped/drom');
+    const prevRunId = '2026-04-27T00-00-00Z';
+    const prevDir = resolve(dromRoot, prevRunId);
+    await mkdir(resolve(prevDir, 'images'), { recursive: true });
+
+    const inheritedRecord = {
+      brand: 'Хонда',
+      brand_slug: 'honda',
+      model: 'Civic',
+      model_slug: 'civic',
+      generation: 'g_2020_1234',
+      year_from: 2020,
+      year_to: 2024,
+      body_types: ['седан'],
+      engine_options: [],
+      drive_options: ['fwd'],
+      description_ru: 'Краткое описание Civic.',
+      price_min_rub: null,
+      price_max_rub: null,
+      image_paths: ['images/honda-civic-g_2020_1234-hero.webp'],
+      source: 'drom-catalog',
+      source_url: 'https://www.drom.ru/catalog/honda/civic/g_2020_1234/',
+      scraped_at: '2026-04-27T00:00:30.000Z',
+    };
+    await writeFile(
+      resolve(prevDir, 'models.json'),
+      JSON.stringify([inheritedRecord], null, 2),
+    );
+    // Need a non-empty WebP-shaped placeholder so copyFile + the on-disk
+    // existsSync check both succeed. The bytes don't matter for this test.
+    await writeFile(
+      resolve(prevDir, 'images', 'honda-civic-g_2020_1234-hero.webp'),
+      Buffer.from('RIFF\x00\x00\x00\x00WEBPVP8 ', 'binary'),
+    );
+    // current/ symlink → prevRunId
+    const { symlink, unlink } = await import('node:fs/promises');
+    if (existsSync(resolve(dromRoot, 'current'))) await unlink(resolve(dromRoot, 'current'));
+    await symlink(prevRunId, resolve(dromRoot, 'current'));
+
+    // Re-use the same fixtures + parser stubs as the first integration test,
+    // scoped to BMW only via DROM_BRAND_WHITELIST.
+    const heroJpeg = await readFile(FIXTURE_HERO);
+    const brandIndexHtml = (await readFile(FIXTURE_BRAND_INDEX, 'utf-8'))
+      .replace(/Проверка по VIN/g, 'История по VIN')
+      .replace(/проверка/gi, 'осмотр');
+    const modelListHtml = await readFile(FIXTURE_MODEL_LIST, 'utf-8');
+    const genListHtml = await readFile(FIXTURE_GEN_LIST, 'utf-8');
+    const genPageHtml = await readFile(FIXTURE_GEN_PAGE, 'utf-8');
+
+    process.env.DROM_BRAND_WHITELIST = 'bmw';
+
+    vi.doMock('../scrapers/drom/parse-brand-index.js', () => ({
+      parseBrandIndex: () => [
+        { brand_slug: 'bmw', latin_name: 'BMW', url: 'https://www.drom.ru/catalog/bmw/' },
+      ],
+    }));
+    vi.doMock('../scrapers/drom/parse-model-list.js', () => ({
+      parseModelList: () => [
+        { model_slug: 'x5', ru_name: 'X5', latin_name: 'X5', url: 'https://www.drom.ru/catalog/bmw/x5/' },
+      ],
+    }));
+    vi.doMock('../scrapers/drom/parse-generation-list.js', () => ({
+      parseGenerationList: (_html: string, modelUrl: string) => [
+        {
+          generation_id: 'g_201808_8395',
+          generation_label: 'G05',
+          url: `${modelUrl}g_201808_8395/`,
+          hero_image_url: 'https://s.auto.drom.ru/i24222/c/photos/generations/500x_test.jpg',
+        },
+      ],
+    }));
+    vi.doMock('../scrapers/shared/http.js', () => ({
+      fetchHtml: async (url: string) => {
+        if (/g_\d{4,6}_\d+\/?$/.test(url)) return genPageHtml;
+        const segments = url.replace(/^https?:\/\/www\.drom\.ru/, '').split('/').filter(Boolean);
+        if (segments[0] !== 'catalog') throw new Error(`Unexpected URL: ${url}`);
+        if (segments.length === 1) return brandIndexHtml;
+        if (segments.length === 2) return modelListHtml;
+        if (segments.length === 3) return genListHtml;
+        throw new Error(`Unexpected URL: ${url}`);
+      },
+      fetchBuffer: async (_url: string) => heroJpeg,
+      politeDelay: async () => {},
+      dromClient: { get: () => { throw new Error('dromClient should not be invoked'); } },
+    }));
+
+    vi.resetModules();
+    const { drom } = await import('../scrapers/drom/index.js');
+    const result = await drom.run({ resume: false });
+
+    expect(result.status).toBe('ok');
+
+    // Read the new current/'s models.json and assert UNION semantics.
+    const currentModels = JSON.parse(
+      await readFile(resolve(dromRoot, 'current/models.json'), 'utf-8'),
+    ) as Array<{ brand_slug: string; model_slug: string; generation: string }>;
+    const keys = new Set(
+      currentModels.map((r) => `${r.brand_slug}:${r.model_slug}:${r.generation}`),
+    );
+    // Inherited honda record preserved
+    expect(keys.has('honda:civic:g_2020_1234')).toBe(true);
+    // BMW record produced by this run
+    expect(keys.has('bmw:x5:g_201808_8395')).toBe(true);
+
+    // Inherited honda image is still on disk in the new current/.
+    expect(
+      existsSync(resolve(dromRoot, 'current/images/honda-civic-g_2020_1234-hero.webp')),
+    ).toBe(true);
+    // BMW image was downloaded fresh.
+    expect(
+      existsSync(resolve(dromRoot, 'current/images/bmw-x5-g_201808_8395-hero.webp')),
+    ).toBe(true);
+
+    // Report counters reflect THIS run's work, not the merged total.
+    const reportJson = JSON.parse(
+      await readFile(resolve(dromRoot, 'current/report.json'), 'utf-8'),
+    );
+    // Exactly one record was added in this run (the bmw x5 g05 generation;
+    // honda was inherited, not added).
+    expect(reportJson.models_added).toBe(1);
+    expect(reportJson.models_updated).toBe(0);
+
+    delete process.env.DROM_BRAND_WHITELIST;
+    vi.doUnmock('../scrapers/drom/parse-brand-index.js');
+    vi.doUnmock('../scrapers/drom/parse-model-list.js');
+    vi.doUnmock('../scrapers/drom/parse-generation-list.js');
+    vi.doUnmock('../scrapers/shared/http.js');
+  }, 120_000);
 });
