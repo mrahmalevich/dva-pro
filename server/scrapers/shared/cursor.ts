@@ -23,6 +23,11 @@ import { atomicWriteFile } from './atomic-write.js';
 export const CursorSchema = z.object({
   lastBrandSlug: z.string().min(1),
   lastModelSlug: z.string().min(1),
+  // SPEC R-4 / D-01..D-03: per-trim resume granularity.
+  //   - null on a fresh model (D-03 reset at model boundary).
+  //   - undefined for cursors written before phase 01.1 (backward-compat).
+  //   - non-negative integer = next trim index to process within the in-flight generation.
+  lastComplectationIndex: z.number().int().min(0).nullable().optional(),
   completedAt: z.string().datetime(),
 });
 export type Cursor = z.infer<typeof CursorSchema>;
