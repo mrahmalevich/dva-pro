@@ -1,10 +1,16 @@
 // server/tests/cursor.test.ts
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { existsSync } from 'node:fs';
-import { readCursor, writeCursor, deleteCursor, type Cursor } from '../scrapers/shared/cursor.js';
+import {
+  readCursor,
+  writeCursor,
+  deleteCursor,
+  CorruptCursorError,
+  type Cursor,
+} from '../scrapers/shared/cursor.js';
 
 let runDir = '';
 
@@ -27,9 +33,70 @@ describe('cursor.ts (D-15)', () => {
     expect(await readCursor(runDir)).toBeNull();
   });
 
-  it('readCursor returns null when .cursor.json is corrupt', async () => {
+  it('readCursor throws CorruptCursorError when .cursor.json is corrupt JSON (WR-04 fix)', async () => {
     await writeFile(resolve(runDir, '.cursor.json'), '{not json');
-    expect(await readCursor(runDir)).toBeNull();
+    await expect(readCursor(runDir)).rejects.toBeInstanceOf(CorruptCursorError);
+    await expect(readCursor(runDir)).rejects.toThrow(/corrupt JSON/);
+  });
+
+  it('readCursor throws CorruptCursorError when .cursor.json has shape mismatch', async () => {
+    // Valid JSON but missing required fields (lastModelSlug, completedAt).
+    await writeFile(
+      resolve(runDir, '.cursor.json'),
+      JSON.stringify({ lastBrandSlug: 'bmw' }),
+    );
+    await expect(readCursor(runDir)).rejects.toBeInstanceOf(CorruptCursorError);
+    await expect(readCursor(runDir)).rejects.toThrow(/shape mismatch/);
+  });
+
+  it('readCursor throws CorruptCursorError when a field is the wrong type', async () => {
+    await writeFile(
+      resolve(runDir, '.cursor.json'),
+      JSON.stringify({
+        lastBrandSlug: 42, // wrong type — must be string
+        lastModelSlug: 'x5',
+        completedAt: '2026-04-28T12:00:00.000Z',
+      }),
+    );
+    await expect(readCursor(runDir)).rejects.toBeInstanceOf(CorruptCursorError);
+  });
+
+  it('readCursor propagates non-ENOENT read errors unchanged (EACCES is NOT wrapped in CorruptCursorError; Behavior 6)', async () => {
+    // Seed a real file so the path exists, then chmod 000 to force a real
+    // EACCES from the OS. This pins the contract that ONLY ENOENT becomes
+    // null and ONLY parse/shape failures become CorruptCursorError; any other
+    // OS-level read error propagates unchanged.
+    //
+    // Plan-vs-implementation note (01-11 deviation): the plan's recommended
+    // approach `vi.spyOn(fsPromises, 'readFile')` is structurally unsupported
+    // in vitest 3.x under ESM ("Cannot spy on export 'readFile'. Module
+    // namespace is not configurable in ESM."). A real-FS EACCES via chmod 000
+    // exercises the same code path with stronger fidelity (no mock layer),
+    // and is the conventional vitest ESM pattern for filesystem-level errors.
+    // Skipped automatically if the test runs as root (CI containers), since
+    // root bypasses POSIX file permissions.
+    if (typeof process.getuid === 'function' && process.getuid() === 0) {
+      // running as root — POSIX read permissions don't apply, can't synthesize EACCES
+      return;
+    }
+    const cursorPath = resolve(runDir, '.cursor.json');
+    await writeFile(cursorPath, JSON.stringify(sample));
+    const { chmod } = await import('node:fs/promises');
+    await chmod(cursorPath, 0o000);
+    try {
+      try {
+        await readCursor(runDir);
+        throw new Error('readCursor should have rejected with EACCES');
+      } catch (err) {
+        // MUST NOT be CorruptCursorError — it must be the original ErrnoException.
+        expect(err).not.toBeInstanceOf(CorruptCursorError);
+        expect((err as NodeJS.ErrnoException).code).toBe('EACCES');
+        expect((err as Error).message).toMatch(/EACCES/);
+      }
+    } finally {
+      // Restore perms so afterEach `rm -rf` can remove the file.
+      await chmod(cursorPath, 0o600).catch(() => undefined);
+    }
   });
 
   it('writeCursor then readCursor round-trips the same object', async () => {
