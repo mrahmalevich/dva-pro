@@ -14,7 +14,10 @@ import { resolve } from 'node:path';
 import { parseBrandIndex } from '../scrapers/drom/parse-brand-index.js';
 import { parseModelList } from '../scrapers/drom/parse-model-list.js';
 import { parseGenerationList } from '../scrapers/drom/parse-generation-list.js';
-import { parseGenerationPage } from '../scrapers/drom/parse-generation-page.js';
+import {
+  parseGenerationPage,
+  extractHeroImageUrl,
+} from '../scrapers/drom/parse-generation-page.js';
 import { ModelRecord } from '../scrapers/shared/types.js';
 
 const fix = (rel: string) => readFileSync(resolve('server/tests/fixtures/drom', rel), 'utf-8');
@@ -142,10 +145,18 @@ describe('parseGenerationPage (SCRAPE-05, D-10) — BMW X5 G05', () => {
     expect(record.year_from!).toBeLessThanOrEqual(2030);
   });
 
-  it('produces image_paths: [<expected hero filename>] when fixture has hero image', () => {
+  it('produces image_paths: [<expected hero filename>] when ctx.heroImageUrl is set (CR-05)', () => {
+    const html = fix('generation.bmw.x5.g05.html');
+    const heroImageUrl = extractHeroImageUrl(html) ?? undefined;
+    expect(heroImageUrl).toBeDefined();
+    const record = parseGenerationPage(html, { ...ctx, heroImageUrl });
+    expect(record.image_paths).toEqual(['images/bmw-x5-g_201808_8395-hero.webp']);
+  });
+
+  it('produces image_paths: [] when ctx.heroImageUrl is undefined (CR-05)', () => {
     const html = fix('generation.bmw.x5.g05.html');
     const record = parseGenerationPage(html, ctx);
-    expect(record.image_paths).toEqual(['images/bmw-x5-g_201808_8395-hero.webp']);
+    expect(record.image_paths).toEqual([]);
   });
 });
 
