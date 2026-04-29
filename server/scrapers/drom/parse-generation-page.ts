@@ -251,6 +251,7 @@ export function parseGenerationPage(html: string, ctx: GenerationPageContext): M
     source: 'drom-catalog',
     source_url: ctx.sourceUrl,
     scraped_at: new Date().toISOString(),
+    complectations: [],
   };
 
   // Pitfall 1: zod throws on schema violation (e.g. body_types had a non-string).
