@@ -41,7 +41,7 @@
   8. Block-detection logic exists in shared scraper code (5+ thin/empty responses or captcha keywords → halt run, write `report.json` with `status: 'blocked'`); even though drom is unlikely to trigger it, the code is in place ready for Phase 1.x scrapers.
   9. Re-running the scraper twice in a row produces a consistent JSON dataset (idempotent). Diff between runs is bounded to expected drom-side changes.
   10. README at `data/scraped/README.md` (or repo top-level docs) explains how to run, where output lands, what stubs do, and how Phase 3's future importer should consume the JSON.
-**Plans:** 9 plans across 6 waves
+**Plans:** 16 plans across 11 waves (gap-closure plans 10–16 added per 01-VERIFICATION.md)
 - [x] 01-01-PLAN.md — pnpm migration + Node-side scaffolding (tsconfig.server.json, vitest.config.ts, .gitignore)
 - [x] 01-02-PLAN.md — IScraper contract + 4 stubs + CLI dispatcher (SCRAPE-01..04 stub)
 - [x] 01-03-PLAN.md — Shared HTTP (got@15) + block-detection + normalize modules
@@ -51,6 +51,13 @@
 - [x] 01-07-PLAN.md — Drom DOM parsers + orchestrator + integration test (SCRAPE-05, SCRAPE-09)
 - [x] 01-08-PLAN.md — SCHEMA.md + README.md docs (Phase 3 handoff)
 - [x] 01-09-PLAN.md — Live drom smoke run gate (manual, gates Phase 1 completion)
+- [ ] 01-10-PLAN.md — Cursor sort-before-compare + -1-throw guards (CR-01/02/03 fix)
+- [ ] 01-11-PLAN.md — Cursor zod schema + CorruptCursorError (WR-04 fix)
+- [ ] 01-12-PLAN.md — CR-04 contract: re-scrape cursored brand + README crash-recovery rewrite
+- [ ] 01-13-PLAN.md — Resume-path integration tests (cursor LOGIC under cursor-present assumption; IN-07)
+- [ ] 01-14-PLAN.md — Image_paths reconciliation + parse/image error split + bounded image-failure abort (CR-05/06)
+- [ ] 01-15-PLAN.md — Per-run HTML viewer auto-emitted by orchestrator + shared report-html module
+- [ ] 01-16-PLAN.md — Brand-root cursor path for cross-invocation resume (BLOCKER 1 follow-up)
 **Complexity:** M — narrowed scope (one real scraper + 4 stubs + shared plumbing) makes this smaller than the original Phase 5 design
 **Research-spike:** YES — drom.ru/catalog access route check (`baza.drom.ru/help/API` partner API vs polite scrape — within <1wk / <$100/mo rule); Crawlee CheerioCrawler patterns for resumable backfill; sharp WebP encoding settings for dimension preservation
 **Parallelisable with:** Phase 2 (Compliance & Infra) — no shared dependency surface; founder content collection
