@@ -48,6 +48,7 @@ data/scraped/
 │       │   ├── bmw-x5-g_2018_8395-hero.webp
 │       │   └── ...
 │       ├── report.json                         # ← run telemetry (D-17)
+│       ├── index.html                          # ← per-run operator viewer (auto-emitted by orchestrator; plan 01-15)
 │       └── .cursor.json                        # ← present only if run unfinished
 └── fx/
     └── cbr-2026-04-28.json                     # ← per-UTC-day FX cache (gitignored)
@@ -94,6 +95,30 @@ If a `pnpm scrape:drom` run dies mid-brand, the next invocation reads `.cursor.j
 6. **On clean completion `.cursor.json` is deleted.**
 
 The brand-boundary granularity is a deliberate Phase 1 trade-off documented in `01-REVIEW.md` (CR-04). Finer-grained cursors (per-model checkpoint persistence) are a Phase 1.x candidate; the snapshot path makes the trade-off acceptable for v1 because no records are permanently lost — only the cursored brand's pages are re-fetched.
+
+### Report viewer (`index.html`) — auto-emitted per run
+
+Every run dir under `data/scraped/drom/<run_id>/` ships a self-contained `index.html` viewer alongside `models.json` and `report.json`. Open it in any modern browser (no server needed):
+
+```bash
+open data/scraped/drom/current/index.html        # macOS
+xdg-open data/scraped/drom/current/index.html    # Linux
+```
+
+The viewer:
+
+- Filters records by brand / body-type / year / search string.
+- Lazy-loads hero WebPs from the run's `images/` directory via relative paths.
+- Surfaces the run's report stats (records, pages visited, errors, duration, blocked responses, image failure rate) in the header.
+- Opens a per-record modal on click with full metadata + source-URL link.
+
+`index.html` is **regeneratable from `models.json` + `report.json`** — it is non-canonical and gitignored. To regenerate after the fact (e.g. for older runs predating plan 01-15):
+
+```bash
+pnpm exec tsx scripts/generate-report-html.mjs data/scraped/drom/<run_id>
+```
+
+The orchestrator emits the viewer on EVERY run regardless of `final_status` (`ok` / `blocked` / `error`). Failed runs include the report's error summary so the operator can triage without `jq`.
 
 ### Incremental snapshot (UPSERT semantics)
 

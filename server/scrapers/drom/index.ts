@@ -41,6 +41,7 @@ import { readCursor, writeCursor, deleteCursor, type Cursor } from '../shared/cu
 import { pointCurrentAt } from '../shared/symlink.js';
 import { mergeAliases, type AliasMap } from '../shared/brand-aliases.js';
 import { atomicWriteFile } from '../shared/atomic-write.js';
+import { writeReportHtml } from '../shared/report-html.js';
 import {
   type IScraper,
   type ModelRecord,
@@ -453,6 +454,14 @@ export const drom: IScraper = {
         JSON.stringify(mergedRecords, null, 2),
       );
       await atomicWriteFile(resolve(runDir, 'report.json'), JSON.stringify(report, null, 2));
+      // Operator HTML viewer (plan 01-15). Best-effort: a viewer write failure
+      // must not abort an otherwise-successful run.
+      await writeReportHtml(runDir, { models: mergedRecords, report }).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[drom] writeReportHtml failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
       await pointCurrentAt(runDir);
       await deleteCursor(runDir);
 
@@ -476,6 +485,8 @@ export const drom: IScraper = {
           resolve(runDir, 'report.json'),
           JSON.stringify(report, null, 2),
         ).catch(() => {});
+        // Operator viewer for blocked runs (plan 01-15). Best-effort.
+        await writeReportHtml(runDir, { report }).catch(() => {});
         return {
           status: 'blocked',
           source: SOURCE,
@@ -495,6 +506,8 @@ export const drom: IScraper = {
         resolve(runDir, 'report.json'),
         JSON.stringify(report, null, 2),
       ).catch(() => {});
+      // Operator viewer for errored runs (plan 01-15). Best-effort.
+      await writeReportHtml(runDir, { report }).catch(() => {});
       return {
         status: 'error',
         source: SOURCE,
