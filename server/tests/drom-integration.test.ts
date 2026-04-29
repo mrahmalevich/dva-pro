@@ -381,4 +381,185 @@ describe('drom orchestrator (SCRAPE-05, SCRAPE-09 end-to-end)', () => {
     vi.doUnmock('../scrapers/drom/parse-generation-list.js');
     vi.doUnmock('../scrapers/shared/http.js');
   }, 120_000);
+
+  it('counter-drift guard: parse + image errors in the same run are counted into separate denominators (WARNING 8 fix)', async () => {
+    // Reset prev current/ from any prior test in this file so this run starts clean.
+    const dromRoot = resolve(workDir, 'data/scraped/drom');
+    const { unlink } = await import('node:fs/promises');
+    if (existsSync(resolve(dromRoot, 'current'))) {
+      await unlink(resolve(dromRoot, 'current'));
+    }
+
+    const fixtures = {
+      heroJpeg: await readFile(FIXTURE_HERO),
+      brandIndexHtml: await readFile(FIXTURE_BRAND_INDEX, 'utf-8'),
+      modelListHtml: await readFile(FIXTURE_MODEL_LIST, 'utf-8'),
+      genListHtml: await readFile(FIXTURE_GEN_LIST, 'utf-8'),
+      genPageHtml: await readFile(FIXTURE_GEN_PAGE, 'utf-8'),
+    };
+
+    // 12 brands so the parse-gate denominator is high enough that 1 parse error
+    // (1/12 ≈ 8.3%) does NOT trip the >10% gate. Only ~12 images attempted in
+    // total (well below the 20-floor for the image gate).
+    const brandList = [
+      ...Array.from({ length: 11 }, (_, i) => ({
+        brand_slug: `b${String(i).padStart(2, '0')}`,
+        latin_name: `B${i}`,
+        url: `https://www.drom.ru/catalog/b${String(i).padStart(2, '0')}/`,
+      })),
+      { brand_slug: 'bmw', latin_name: 'BMW', url: 'https://www.drom.ru/catalog/bmw/' },
+    ];
+
+    // Live binding captured by the fetchBuffer closure below.
+    let imageCallCount = 0;
+
+    vi.doMock('../scrapers/drom/parse-brand-index.js', () => ({
+      parseBrandIndex: () => brandList,
+    }));
+
+    vi.doMock('../scrapers/drom/parse-model-list.js', () => ({
+      parseModelList: (_html: string, brandUrl: string) => {
+        if (brandUrl.includes('/bmw/')) {
+          return [
+            { model_slug: 'x3', ru_name: 'X3', latin_name: 'X3', url: `${brandUrl}x3/` },
+            { model_slug: 'x5', ru_name: 'X5', latin_name: 'X5', url: `${brandUrl}x5/` },
+          ];
+        }
+        return [{ model_slug: 'm', ru_name: 'M', latin_name: 'M', url: `${brandUrl}m/` }];
+      },
+    }));
+
+    vi.doMock('../scrapers/drom/parse-generation-list.js', () => ({
+      parseGenerationList: (_html: string, modelUrl: string) => [
+        {
+          generation_id: 'g_201808_8395',
+          generation_label: 'G05',
+          url: `${modelUrl}g_201808_8395/`,
+          hero_image_url: 'https://s.auto.drom.ru/i24222/c/photos/generations/500x_test.jpg',
+        },
+      ],
+    }));
+
+    // parseGenerationPage: succeed for everyone EXCEPT bmw/x5 (throw a parse error).
+    vi.doMock('../scrapers/drom/parse-generation-page.js', async () => {
+      const actual = await vi.importActual<typeof import('../scrapers/drom/parse-generation-page.js')>(
+        '../scrapers/drom/parse-generation-page.js',
+      );
+      return {
+        ...actual,
+        parseGenerationPage: (_html: string, ctx: any) => {
+          if (ctx.brand_slug === 'bmw' && ctx.model_slug === 'x5') {
+            throw new Error('synthetic parse error for x5');
+          }
+          return {
+            brand: ctx.brand,
+            brand_slug: ctx.brand_slug,
+            model: ctx.model,
+            model_slug: ctx.model_slug,
+            generation: ctx.generation,
+            year_from: 2018,
+            year_to: 2022,
+            body_types: ['SUV'],
+            engine_options: [],
+            drive_options: [],
+            description_ru: 'test description for counter-drift integration',
+            price_min_rub: null,
+            price_max_rub: null,
+            image_paths: ctx.heroImageUrl
+              ? [`images/${ctx.brand_slug}-${ctx.model_slug}-${ctx.generation}-hero.webp`]
+              : [],
+            source: 'drom-catalog' as const,
+            source_url: ctx.sourceUrl,
+            scraped_at: new Date().toISOString(),
+          };
+        },
+      };
+    });
+
+    // fetchBuffer: throw on the FIRST image (bmw/x3 — alphabetically the first BMW
+    // model; but order across brands matters too — we trip on whichever image
+    // happens to be requested first). All other images succeed.
+    vi.doMock('../scrapers/shared/http.js', () => ({
+      fetchHtml: async (url: string) => {
+        if (/g_\d{4,6}_\d+\/?$/.test(url)) return fixtures.genPageHtml;
+        const segs = url.replace(/^https?:\/\/www\.drom\.ru/, '').split('/').filter(Boolean);
+        if (segs[0] !== 'catalog') throw new Error(`Unexpected URL: ${url}`);
+        if (segs.length === 1) return fixtures.brandIndexHtml;
+        if (segs.length === 2) return fixtures.modelListHtml;
+        if (segs.length === 3) return fixtures.genListHtml;
+        throw new Error(`Unexpected URL: ${url}`);
+      },
+      fetchBuffer: async (url: string) => {
+        // Synthetic CDN 503 for the FIRST image fetch. Every subsequent fetch
+        // succeeds — yields exactly 1 images_failed and N-1 images_downloaded.
+        if (url.includes('500x_test.jpg')) {
+          imageCallCount++;
+          if (imageCallCount === 1) throw new Error('synthetic CDN 503 for first image');
+          return fixtures.heroJpeg;
+        }
+        return fixtures.heroJpeg;
+      },
+      politeDelay: async () => {},
+      dromClient: {
+        get: () => {
+          throw new Error('dromClient should not be invoked');
+        },
+      },
+    }));
+
+    vi.resetModules();
+    const { drom } = await import('../scrapers/drom/index.js');
+    const result = await drom.run({ resume: false });
+
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') return;
+
+    // Read the written report.json (canonical artifact) — it must agree with
+    // the in-memory result.report on counter denominators.
+    const reportJson = JSON.parse(
+      await readFile(resolve(dromRoot, 'current/report.json'), 'utf-8'),
+    );
+
+    // Exactly 1 parse error (bmw/x5) and exactly 1 image error (whichever image
+    // was fetched first — counters split by `kind` is the contract being pinned).
+    const parseErrors = reportJson.errors.filter((e: any) => e.kind === 'parse');
+    const imageErrors = reportJson.errors.filter((e: any) => e.kind === 'image');
+    expect(parseErrors.length).toBe(1);
+    expect(imageErrors.length).toBe(1);
+    expect(reportJson.errors.length).toBe(2);
+    expect(reportJson.images_failed).toBe(1);
+    // 12 brands × 1–2 models each: bmw produces 2 (x3 + x5), the 11 b00-b10
+    // brands each produce 1 — minus the bmw/x5 parse failure (no image fetched)
+    // and minus the first image (failed). Net images_downloaded >= 1.
+    expect(reportJson.images_downloaded).toBeGreaterThan(0);
+    expect(reportJson.image_failure_rate).toBeGreaterThan(0);
+    expect(reportJson.image_failure_rate).toBeLessThan(1);
+
+    // CR-05 reconciliation: any record whose image fetch failed has empty
+    // image_paths. We don't know which exact record was hit (depends on URL
+    // ordering), but the model that has the image error must agree.
+    const modelsJson = JSON.parse(
+      await readFile(resolve(dromRoot, 'current/models.json'), 'utf-8'),
+    ) as Array<{
+      brand_slug: string;
+      model_slug: string;
+      image_paths: string[];
+      source_url: string;
+    }>;
+    // bmw/x5 must NOT be present (parse failed).
+    expect(
+      modelsJson.find((r) => r.brand_slug === 'bmw' && r.model_slug === 'x5'),
+    ).toBeUndefined();
+    // Exactly one record across the snapshot has empty image_paths
+    // (the one whose download failed). Every other record has the expected
+    // hero filename.
+    const emptyImagePathsRecords = modelsJson.filter((r) => r.image_paths.length === 0);
+    expect(emptyImagePathsRecords.length).toBe(1);
+
+    vi.doUnmock('../scrapers/drom/parse-brand-index.js');
+    vi.doUnmock('../scrapers/drom/parse-model-list.js');
+    vi.doUnmock('../scrapers/drom/parse-generation-list.js');
+    vi.doUnmock('../scrapers/drom/parse-generation-page.js');
+    vi.doUnmock('../scrapers/shared/http.js');
+  }, 120_000);
 });

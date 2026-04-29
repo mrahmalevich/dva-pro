@@ -126,6 +126,7 @@ async function inheritFromPrevCurrent(
       report.errors.push({
         url: prevModelsPath,
         message: `inherit: ${err instanceof Error ? err.message : String(err)}`,
+        kind: 'inherit',
       });
     }
   }
@@ -155,6 +156,7 @@ async function inheritFromPrevCurrent(
         report.errors.push({
           url: src,
           message: `inherit-image: ${err instanceof Error ? err.message : String(err)}`,
+          kind: 'inherit',
         });
       }
     }
@@ -173,11 +175,13 @@ function emptyReport(startedAt: string): ReportSummary {
     models_updated: 0,
     images_downloaded: 0,
     images_skipped: 0,
+    images_failed: 0,
     errors: [],
     rate_limit_hits: 0,
     blocked_responses: 0,
     fx_stale: false,
     cursor_resumed: false,
+    image_failure_rate: 0,
     final_status: 'error',
   };
 }
@@ -330,6 +334,7 @@ export const drom: IScraper = {
                 model_slug: model.model_slug,
                 generation: gen.generation_id,
                 sourceUrl: gen.url,
+                heroImageUrl: gen.hero_image_url,
               });
               const key = `${record.brand_slug}:${record.model_slug}:${record.generation}`;
               if (inheritedKeys.has(key)) {
@@ -341,8 +346,11 @@ export const drom: IScraper = {
               modelsTouchedThisRun++;
 
               // 6. Hero image download (sequenced via shared/images.ts pLimit(4)).
-              //    If the image was already inherited from prev current/, the
-              //    target file exists on disk — skip the network call.
+              //    Counters split per CR-06 / WR-06:
+              //      images_skipped — inherited from prev current/, OR no source URL
+              //      images_failed  — we tried and failed (network / transcode)
+              //    On failure we ALSO clear record.image_paths so models.json
+              //    never references a WebP that is not on disk (CR-05).
               const heroRel = record.image_paths[0];
               const heroAbs = heroRel ? resolve(runDir, heroRel) : null;
               if (heroAbs && existsSync(heroAbs)) {
@@ -352,11 +360,14 @@ export const drom: IScraper = {
                   await downloadAndConvert(gen.hero_image_url, heroRel, runDir);
                   report.images_downloaded++;
                 } catch (imgErr) {
-                  report.images_skipped++;
+                  report.images_failed++;
                   report.errors.push({
                     url: gen.hero_image_url,
                     message: `image: ${imgErr instanceof Error ? imgErr.message : String(imgErr)}`,
+                    kind: 'image',
                   });
+                  // CR-05: do not leave an orphan path in models.json.
+                  record.image_paths = [];
                 }
               } else {
                 report.images_skipped++;
@@ -365,6 +376,7 @@ export const drom: IScraper = {
               report.errors.push({
                 url: gen.url,
                 message: `parse: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`,
+                kind: 'parse',
               });
             }
           }
@@ -386,13 +398,29 @@ export const drom: IScraper = {
         await mergeAliases(brandAliasesPath, { [brand.brand_slug]: brandEntry });
       }
 
-      // Pitfall 1: if >10 % of THIS RUN's attempted records failed validation,
-      // treat as DOM regression. Inherited records from prev current/ are
-      // excluded from the denominator — they are not "attempted" by this run.
-      const totalAttempted = modelsTouchedThisRun + report.errors.length;
-      if (totalAttempted > 0 && report.errors.length / totalAttempted > 0.1) {
+      // Pitfall 1 (CR-06 split): the >10% drop-out gate counts ONLY parse errors
+      // (DOM-regression signal). Image-fetch errors are tracked separately
+      // (images_failed) and have their own bounded threshold below.
+      const parseErrors = report.errors.filter((e) => e.kind === 'parse').length;
+      const totalParseAttempted = modelsTouchedThisRun + parseErrors;
+      if (totalParseAttempted > 0 && parseErrors / totalParseAttempted > 0.1) {
         throw new Error(
-          `Validation drop-out > 10% (${report.errors.length} of ${totalAttempted}); likely DOM regression`,
+          `DOM regression: parse errors > 10% (${parseErrors} of ${totalParseAttempted})`,
+        );
+      }
+
+      // CR-06 image abort gate: a bad CDN day must not lose an otherwise-clean
+      // run. Abort only when the absolute count is meaningful AND the rate is
+      // high; below that, surface via image_failure_rate in report.json.
+      const imagesAttempted = report.images_downloaded + report.images_failed;
+      report.image_failure_rate =
+        imagesAttempted > 0
+          ? Math.round((report.images_failed / imagesAttempted) * 10000) / 10000
+          : 0;
+      if (imagesAttempted >= 20 && report.images_failed / imagesAttempted > 0.20) {
+        throw new Error(
+          `Image-fetch failure rate > 20% (${report.images_failed} of ${imagesAttempted}); ` +
+            `likely CDN outage — re-run after 24h`,
         );
       }
 
@@ -446,6 +474,7 @@ export const drom: IScraper = {
       report.errors.push({
         url: 'orchestrator',
         message: err instanceof Error ? err.message : String(err),
+        kind: 'orchestrator',
       });
       await atomicWriteFile(
         resolve(runDir, 'report.json'),
