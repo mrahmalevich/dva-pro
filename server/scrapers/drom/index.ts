@@ -235,18 +235,34 @@ export const drom: IScraper = {
         .split(',')
         .map((s) => s.trim().toLowerCase())
         .filter(Boolean);
-      const brands =
+      const filteredBrands =
         whitelist.length > 0
           ? allBrands.filter((b) => whitelist.includes(b.brand_slug))
           : allBrands;
+      // Sort alphabetically by brand_slug so the cursor's lexicographic
+      // comparison below is semantically correct regardless of drom DOM order
+      // (CR-01 / CR-03 fix per 01-REVIEW.md). Parsers return DOM-traversal
+      // order; the orchestrator owns ordering for cursor purposes.
+      const brands = [...filteredBrands].sort((a, b) =>
+        a.brand_slug.localeCompare(b.brand_slug),
+      );
 
-      // Resume: drop brands lexicographically < lastBrandSlug.
-      const startFromBrandIndex = cursor
-        ? Math.max(
-            0,
-            brands.findIndex((b) => b.brand_slug >= cursor!.lastBrandSlug),
-          )
-        : 0;
+      // Resume: skip brands lexicographically < lastBrandSlug.
+      // Throw loudly when the cursored brand has vanished (drom removal or
+      // whitelist exclusion) instead of silently restarting from index 0
+      // (CR-01 fix per 01-REVIEW.md).
+      let startFromBrandIndex = 0;
+      if (cursor) {
+        const idx = brands.findIndex((b) => b.brand_slug >= cursor.lastBrandSlug);
+        if (idx === -1) {
+          throw new Error(
+            `Cursor.lastBrandSlug='${cursor.lastBrandSlug}' not present in current brand list ` +
+              `(removed from drom or filtered by DROM_BRAND_WHITELIST). ` +
+              `Refusing silent restart; delete .cursor.json explicitly to start over.`,
+          );
+        }
+        startFromBrandIndex = idx;
+      }
 
       for (let bi = startFromBrandIndex; bi < brands.length; bi++) {
         const brand = brands[bi];
@@ -256,16 +272,31 @@ export const drom: IScraper = {
         const modelListHtml = await fetchHtml(brand.url);
         detector.inspect(brand.url, modelListHtml);
         report.pages_visited++;
-        const models = parseModelList(modelListHtml, brand.url);
+        const parsedModels = parseModelList(modelListHtml, brand.url);
+        // Sort alphabetically by model_slug so the cursor's lexicographic
+        // comparison below is correct regardless of drom DOM order
+        // (CR-02 / CR-03 fix per 01-REVIEW.md).
+        const models = [...parsedModels].sort((a, b) =>
+          a.model_slug.localeCompare(b.model_slug),
+        );
 
-        // Resume: if cursor is on this brand, drop already-completed models.
-        const startFromModelIndex =
-          cursor && brand.brand_slug === cursor.lastBrandSlug
-            ? Math.max(
-                0,
-                models.findIndex((m) => m.model_slug > cursor!.lastModelSlug),
-              )
-            : 0;
+        // Resume: if cursor is on this brand, position at lastModelSlug
+        // (inclusive — the cursored model is included so it is re-scraped, per
+        // the CR-04 "re-scrape cursored brand" contract documented and pinned
+        // by sibling plan 01-12). Throw loudly when the cursored model is
+        // absent from the current brand (CR-02 fix per 01-REVIEW.md).
+        let startFromModelIndex = 0;
+        if (cursor && brand.brand_slug === cursor.lastBrandSlug) {
+          const idx = models.findIndex((m) => m.model_slug >= cursor.lastModelSlug);
+          if (idx === -1) {
+            throw new Error(
+              `Cursor.lastModelSlug='${cursor.lastModelSlug}' not present in current model list ` +
+                `for brand '${brand.brand_slug}'. Refusing silent restart of brand; ` +
+                `delete .cursor.json explicitly to start over.`,
+            );
+          }
+          startFromModelIndex = idx;
+        }
 
         for (let mi = startFromModelIndex; mi < models.length; mi++) {
           const model = models[mi];
