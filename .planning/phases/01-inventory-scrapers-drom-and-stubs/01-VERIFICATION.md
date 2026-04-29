@@ -37,6 +37,28 @@ gaps:
       - "Fix CR-03: sort brands.sort(localeCompare) and models.sort(localeCompare) before applying cursor logic, OR change cursor semantics to set-membership"
       - "Fix CR-04: either document 'resume re-scrapes the cursored brand from scratch' and force startFromModelIndex=0 when cursor is set, OR persist brandModels/records to disk after every model"
       - "Tighten readCursor to distinguish ENOENT from corrupt JSON and validate shape with zod"
+      - "Address CR-05 image_paths desync (orphan paths or orphan files) and CR-06 image-fetch failure abort threshold"
+  - truth: "Operator can review scrape output without running queries — every run folder ships a self-contained HTML viewer."
+    status: missing
+    reason: |
+      Operator workflow gap surfaced during plan-09 sign-off: reviewing models.json
+      requires jq + manual diffing. A standalone scripts/generate-report-html.mjs
+      shipped as part of phase 01 produces an index.html viewer (filter by brand /
+      body / search / year, lazy-loaded WebPs) but it is run manually after the
+      fact, not by the orchestrator on run completion. Every future run should
+      auto-emit index.html so the operator can `open data/scraped/drom/<run_id>/index.html`
+      with no additional steps.
+    artifacts:
+      - path: "server/scrapers/drom/index.ts"
+        issue: "Run-completion section (lines 219-237) does not invoke HTML generation; only writes models.json + report.json + symlink"
+      - path: "scripts/generate-report-html.mjs"
+        issue: "Exists as a one-shot CLI script but has no programmatic export; orchestrator can't import it cleanly"
+    missing:
+      - "Refactor scripts/generate-report-html.mjs into server/scrapers/shared/report-html.ts exporting writeReportHtml(runDir) — so any IScraper (drom + future encar/beforward/etc.) can call it"
+      - "Wire writeReportHtml(runDir) into drom orchestrator after report.json is written and before symlink is updated, regardless of final_status (so blocked/error runs also get viewers)"
+      - "Add unit test on report-html.ts: smallest fixture (1 model, 1 image) → assert index.html exists, contains the model brand string, and parses as valid HTML"
+      - "Update data/scraped/README.md and SCHEMA.md: document index.html as a per-run artifact alongside models.json/report.json"
+      - "Keep scripts/generate-report-html.mjs as a backward-compat one-shot for runs predating the integration"
 human_verification:
   - test: "Operator triggers a long-running `pnpm scrape:drom` (no whitelist), then SIGKILLs the process mid-brand, then re-runs. Confirm second invocation resumes correctly without silently re-doing already-finished brands and without losing brand-aliases entries from the aborted brand."
     expected: |
