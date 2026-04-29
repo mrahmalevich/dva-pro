@@ -216,12 +216,19 @@ export const drom: IScraper = {
     void prevRunId; // reserved for future report.json field; suppressed for now
 
     let cursor: Cursor | null = null;
-    if (opts.resume) {
-      cursor = await readCursor(runDir);
-      report.cursor_resumed = cursor !== null;
-    }
 
     try {
+      // Read the resume cursor INSIDE the outer try so a corrupt cursor
+      // (CorruptCursorError from readCursor post-plan-11) becomes a structured
+      // {status: 'error'} ScrapeResult instead of an unhandled rejection — the
+      // operator contract is "drom.run() returns ScrapeResult; never throws"
+      // (IScraper in shared/types.ts). Validated by 01-13 resume integration
+      // test 'returns status=error when readCursor throws CorruptCursorError'.
+      if (opts.resume) {
+        cursor = await readCursor(runDir);
+        report.cursor_resumed = cursor !== null;
+      }
+
       // 1. FX feed first — fail-fast if no cache exists yet (D-12).
       const fx = await fetchFx({ firstRun: !cursor });
       report.fx_stale = fx.source === 'cbr-cache';
@@ -257,10 +264,14 @@ export const drom: IScraper = {
       // (CR-01 fix per 01-REVIEW.md).
       let startFromBrandIndex = 0;
       if (cursor) {
-        const idx = brands.findIndex((b) => b.brand_slug >= cursor.lastBrandSlug);
+        // Capture into a const so TS narrows inside the findIndex closure
+        // (the outer `cursor` is a mutable `let` that TS conservatively
+        // re-widens to `Cursor | null` inside arrow-function callbacks).
+        const c = cursor;
+        const idx = brands.findIndex((b) => b.brand_slug >= c.lastBrandSlug);
         if (idx === -1) {
           throw new Error(
-            `Cursor.lastBrandSlug='${cursor.lastBrandSlug}' not present in current brand list ` +
+            `Cursor.lastBrandSlug='${c.lastBrandSlug}' not present in current brand list ` +
               `(removed from drom or filtered by DROM_BRAND_WHITELIST). ` +
               `Refusing silent restart; delete .cursor.json explicitly to start over.`,
           );
@@ -297,10 +308,14 @@ export const drom: IScraper = {
         //   operator even though we will be re-scraping the brand fresh.
         let startFromModelIndex = 0;
         if (cursor && brand.brand_slug === cursor.lastBrandSlug) {
-          const idx = models.findIndex((m) => m.model_slug >= cursor.lastModelSlug);
+          // Capture into a const so TS narrows inside the findIndex closure
+          // (mutable-let widening inside arrow callbacks; same pattern as the
+          // brand-cursor block above).
+          const c = cursor;
+          const idx = models.findIndex((m) => m.model_slug >= c.lastModelSlug);
           if (idx === -1) {
             throw new Error(
-              `Cursor.lastModelSlug='${cursor.lastModelSlug}' not present in current model list ` +
+              `Cursor.lastModelSlug='${c.lastModelSlug}' not present in current model list ` +
                 `for brand '${brand.brand_slug}'. Refusing silent restart of brand; ` +
                 `delete .cursor.json explicitly to start over.`,
             );
