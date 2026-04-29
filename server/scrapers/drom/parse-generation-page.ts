@@ -38,6 +38,13 @@ export interface GenerationPageContext {
   model_slug: string;
   generation: string;
   sourceUrl: string;
+  /**
+   * Hero image URL surfaced by parseGenerationList (single source of truth
+   * per CR-05 fix). When provided non-empty, parseGenerationPage emits a
+   * corresponding image_paths entry; the orchestrator then attempts the
+   * download. When undefined/empty, image_paths = [] and no download.
+   */
+  heroImageUrl?: string;
 }
 
 type EngineSpec = {
@@ -218,11 +225,13 @@ export function parseGenerationPage(html: string, ctx: GenerationPageContext): M
   // 5. price_min_rub / price_max_rub from the complectation table.
   const { min: price_min_rub, max: price_max_rub } = extractPrices($);
 
-  // 6. Hero image URL → image_paths entry (orchestrator downloads the file).
-  const heroImg = extractHeroImageUrl(html);
-  const image_paths = heroImg
-    ? [`images/${ctx.brand_slug}-${ctx.model_slug}-${ctx.generation}-hero.webp`]
-    : [];
+  // 6. Hero image URL → image_paths entry. Orchestrator passes ctx.heroImageUrl
+  //    from parseGenerationList (single source of truth per CR-05 fix). Empty
+  //    or undefined → image_paths = [] and the orchestrator skips the fetch.
+  const image_paths =
+    ctx.heroImageUrl && ctx.heroImageUrl.length > 0
+      ? [`images/${ctx.brand_slug}-${ctx.model_slug}-${ctx.generation}-hero.webp`]
+      : [];
 
   const record: ModelRecord = {
     brand: ctx.brand,
