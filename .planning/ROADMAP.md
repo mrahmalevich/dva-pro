@@ -74,13 +74,39 @@
 
 ### Phase 01.1: extend-drom-scrape-fields (INSERTED)
 
-**Goal:** [Urgent work - to be planned]
-**Requirements**: TBD
-**Depends on:** Phase 01
-**Plans:** 0 plans
+**Goal:** Extend the drom catalog scraper to walk per-complectation detail pages and persist a full per-trim record (six field groups: identity, pricing, drivetrain, dimensions, comfort, tires) nested inside each `ModelRecord`, validated end-to-end against a BMW-only pilot sweep with snapshot + screenshot regression goldens.
+**Depends on:** Phase 01 (drom orchestrator, cheerio+zod parser pattern, cursor module, polite-delay HTTP client, snapshot golden plumbing, per-run HTML viewer all in place from plans 01..16).
+**Requirements:** R-1, R-2, R-3, R-4, R-5, R-6, R-7, R-8 (locked in `01.1-SPEC.md`; ambiguity 0.13)
+**Success Criteria** (what must be TRUE):
+  1. `parse-complectation-page.ts` exists; unit tests pass against ≥ 3 captured BMW fixtures + ≥ 2 broken/missing-section fixtures (R-1)
+  2. `Complectation` zod schema added to `server/scrapers/shared/types.ts`; `ModelRecord.complectations` is a non-optional array with `.default([])` for inheritFromPrevCurrent backward-compat (R-2, R-3)
+  3. Drom orchestrator fetches per-comp pages **only** for BMW brand (`BMW_PILOT_BRANDS = new Set(['bmw'])`); non-BMW brands' generation handling unchanged (R-4)
+  4. Probe-down rate limiter unit-tested: starts at 10 s, halves to 5 s after 100 OK, resets to 10 s on 429, never below 5 s (R-5)
+  5. BMW pilot run produces `models.json` whose every BMW `ModelRecord` carries a non-empty `complectations[]` array AND `report.json.field_coverage` with all six groups ≥ 0.70 (R-2, R-7)
+  6. Run completes with `final_status: 'ok'` even when individual per-comp pages have missing or broken sections — the per-comp parser is fail-soft (`safeParse`, never throws); failures emit `_extraction_errors[]` annotation (R-6)
+  7. `bmw-pilot.test.ts` snapshot locks per-field-group coverage (six rates rounded to 2 dp); CI fails on snapshot mismatch (R-8)
+  8. `bmw-pilot-viewer.png` screenshot golden locks HTML viewer rendering of complectation fields via puppeteer + pixelmatch + pngjs (devDep-only); CI fails on > 0.5 % image diff (R-8)
+**Plans:** 9 plans across 6 waves
+- [ ] 01.1-01-PLAN.md — Wave 0: pnpm add -D puppeteer + pixelmatch + pngjs + @types/*; --capture-fixture CLI; capture 3 live + 2 hand-edited BMW fixtures (checkpoint:human-verify)
+- [ ] 01.1-02-PLAN.md — Wave 1: Complectation zod sub-schema + ModelRecord.complectations + ReportSummary.field_coverage + complectation-schema.test.ts (R-2, R-3)
+- [ ] 01.1-03-PLAN.md — Wave 1: ProbeDownLimiter pure module + http.ts wiring + rate-limiter.test.ts (R-5)
+- [ ] 01.1-04-PLAN.md — Wave 2: coverage.ts (computeFieldCoverage + meetsCoverageGate) + coverage.test.ts (R-7)
+- [ ] 01.1-05-PLAN.md — Wave 2: parseComplectationPage fail-soft + extractTrimRows + parse-complectation-page.test.ts (R-1, R-3, R-6)
+- [ ] 01.1-06-PLAN.md — Wave 1: cursor.ts gains lastComplectationIndex (D-01..D-04) + cursor.test.ts forward+backward-compat
+- [ ] 01.1-07-PLAN.md — Wave 3: drom/index.ts BMW filter + per-comp loop + engine cross-walk + per-trim cursor + coverage emit + drom-integration.test.ts (R-4, R-6, R-7)
+- [ ] 01.1-08-PLAN.md — Wave 4: report-html.ts Комплектации section + Coverage tiles + bmw-pilot.test.ts snapshot golden (R-8 snapshot half)
+- [ ] 01.1-09-PLAN.md — Wave 5: bmw-pilot-viewer.test.ts puppeteer+pixelmatch screenshot golden + SCHEMA.md/README.md docs + manual BMW pilot run gate (R-8 PNG half + R-2/R-4/R-7 manual end-to-end)
+**Complexity:** M — pure extension of an in-flight scraper; every new module mirrors a Phase 01 analog (RESEARCH.md confidence HIGH)
+**Research-spike:** Researched 2026-04-29 (`01.1-RESEARCH.md`); HIGH confidence; live-verified DOM against `/catalog/bmw/x5/207354/`; standard stack locked: puppeteer 24.42 + pixelmatch 7.2 + pngjs 7.0 (devDeps for one screenshot test)
+**Parallelisable with:** Phase 2 (Compliance & Infra) — no shared dependency surface; founder content collection
+**UI hint:** no — operator HTML viewer extension only
+**Notes:**
+- BMW-only by SPEC R-4; multi-brand sweep deferred to v1.x
+- Probe-down rate-limit floor 5 s is hardcoded (SPEC C-1); CLI override deferred
+- baza.drom.ru classifieds scraper for "average price" is NOT in scope — separate site, separate phase
+- Drom partner-API spike (D-04 from 01-CONTEXT.md) kept deferred — re-evaluate after BMW pilot ships if multi-brand expansion is desired
 
-Plans:
-- [ ] TBD (run /gsd-plan-phase 01.1 to break down)
+---
 
 ### Phase 2: Compliance & Infra Foundation
 
@@ -115,7 +141,7 @@ Plans:
   6. Importer (`pnpm import:scraped`) reads Phase 1 JSON output and upserts `models` + `cars` rows by `(source, source_id)`; rehosts WebP images from `data/scraped/.../images/*.webp` to Yandex Object Storage; idempotent on re-run
 **Plans**: TBD
 **Complexity:** M
-**Research-spike:** no — Drizzle schema механически выводится из ARCHITECTURE.md
+**Research-spike:** no — Drizzle schema механически выводится from ARCHITECTURE.md
 **Parallelisable with:** Phase 1 finishes the JSON contract before importer is locked; PDF template design draft (можно начинать как только schema готова); founder content writing
 **UI hint:** no
 
@@ -219,7 +245,8 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Inventory Scrapers (drom + stubs, JSON/WebP) | 0/9 | Ready to execute | — |
+| 1. Inventory Scrapers (drom + stubs, JSON/WebP) | 16/16 | Complete | 2026-04-29 |
+| 01.1. extend-drom-scrape-fields | 0/9 | Ready to execute | — |
 | 2. Compliance & Infra Foundation | 0/0 | Not started | — |
 | 3. Schema, API Skeleton & Country Registry | 0/0 | Not started | — |
 | 4. Frontend Integration, Consent & Legal | 0/0 | Not started | — |
@@ -234,6 +261,7 @@ Plans:
 
 **Hard sequence (calendar-bound):**
 - Phase 1 (drom scraper → JSON/WebP) и Phase 2 (Compliance & Infra) стартуют параллельно в неделю 1 — у них нет общей dependency surface. Phase 1 локальный, Phase 2 — Roskomnadzor 5-day window + Unisender Go 14-day warm-up в фоне.
+- Phase 01.1 (per-trim deep-dive) follows Phase 01; runs locally, no infra dependency. Inserted post-Phase-01 to bring complectation data into the JSON contract Phase 03 importer will consume.
 - Phase 3 schema до Phase 4 frontend rewrite — иначе CrmProvider пишется против моков, а потом переписывается дважды. Phase 3 importer закрывает Phase 1 → DB переход.
 - Phase 4 consent UI до того, как любая публичная форма пойдёт live в Phase 5 — 152-ФЗ irreversible.
 - Phase 5 lead flow до Phase 6 (admin auth) — leads нужны до того, как LeadsAdmin может что-то показать.
@@ -242,6 +270,7 @@ Plans:
 
 **Parallel tracks (config has parallelization=true):**
 - **Phase 1 + Phase 2 в неделю 1** — независимые dependency surfaces. Phase 1 локальный, не требует Yandex Cloud; Phase 2 — pure infra/compliance.
+- **Phase 01.1 + Phase 2** — also independent. Phase 01.1 is local-only (drom + dev machine); Phase 2 is pure infra/compliance.
 - **Founder content** (биографии, фото, отзывы, видео-pitch) — pure content, можно начинать в Phase 1 и завершать в Phase 7; не блокирует никакую код-фазу.
 - **PDF template design draft** — стартует как только schema из Phase 3 готова, готовится параллельно с Phase 4.
 - **Phase 6 admin polish (CarsAdmin / FaqAdmin / ReviewsAdmin)** — может стартовать параллельно с Phase 5 backend (leads-admin ждёт auth, но cars/faq/reviews не требуют lead-flow).
@@ -254,7 +283,7 @@ Plans:
 | Week | Primary work | Parallel track |
 |------|--------------|----------------|
 | 1 (Apr 27 – May 3) | Phase 1 (drom scraper + stubs end-to-end) + Phase 2 (infra + Roskomnadzor подача + DNS warm-up start) | Founder content kickoff |
-| 2 (May 4 – May 10) | Phase 3 (schema + API skeleton + country registry + Phase 1 importer) | Phase 4 prep, PDF template design |
+| 2 (May 4 – May 10) | Phase 01.1 (extend-drom-scrape-fields BMW pilot) + Phase 3 (schema + API skeleton + country registry + Phase 1 importer) | Phase 4 prep, PDF template design |
 | 3 (May 11 – May 17) | Phase 4 (CrmProvider rewrite + consent + legal) + Phase 5 start (PDF pipeline) | Phase 6 admin scaffolding |
 | 4 (May 18 – May 24) | Phase 5 finish (E2E lead flow на yandex.ru/mail.ru) | Phase 6 auth scaffolding |
 | 5 (May 25 – May 31) | Phase 6 (auth + admin) | Phase 7 content + analytics |
@@ -264,12 +293,17 @@ Plans:
 - If drom partner API onboarding > 1 week → fall back to polite scrape (Cheerio + 1 req/10–15s); already covered by D-05 in old Phase 5 context (carries forward).
 - If Unisender Go warm-up has spam complaints in week 2 → tighten DMARC `p=quarantine` + delay first prod-email до week 3.
 - Live scrapers (Encar/BeForward/Che168/Autohome) explicitly v1.x — Phase 1 ships only stubs. CONTENT-07 (≥12 авто в каталоге) covered by drom-imported models + admin-curated cars in Phase 6.
+- Phase 01.1 BMW pilot run is real-network 5–7h continuous; if drom rate-limits at 5 s probe-down floor, run aborts and re-attempts; budgeted in week 2 alongside Phase 3 schema work.
 
 ---
 
 ## Out of v1 Roadmap (deferred to post-soft-launch)
 
 - **Live scrapers for Encar / BeForward / Che168 / Autohome** — Phase 1 ships `IScraper` stubs only; full implementations (Crawlee + Playwright + residential proxies + Carapis fallback) deferred to v1.x
+- **Multi-brand drom catalog deep-dive beyond BMW** — Phase 01.1 ships BMW only; multi-brand expansion deferred to v1.x
+- **`baza.drom.ru` classifieds aggregator for "average price"** — separate site with separate bot-detection profile; future phase
+- **Drom partner API spike** — kept deferred from Phase 01-D-04; re-evaluate after Phase 01.1 BMW pilot ships
+- **Structured tire spec parsing** (`225/65R17 102H` → `width / aspect / diameter / load_index / speed_rating`) — deferred to v1.x or to Phase 03's importer
 - Bitrix24 sync (BITRIX-01..04)
 - US/UAE/Europe scrapers (SCRAPE-EXPAND-01..03)
 - Real customs/utilsbor formulas (CUSTOMS-01)
@@ -301,6 +335,10 @@ Renumber map:
 
 The 8 plans created against the old Phase 5 (DB+S3-coupled) were discarded; the new Phase 1 will be re-planned via `/gsd-discuss-phase 1` → `/gsd-plan-phase 1`. The old `05-RESEARCH.md` content (Crawlee/Playwright/Cheerio research, drom rate limits, source posture analysis, proxy economics) is partially still valuable but has been removed alongside the old plans — research-spike will redo what's needed for the narrower scope.
 
+**2026-04-29 — Phase 01.1 inserted (extend-drom-scrape-fields)**
+
+After Phase 01 closed (16/16 plans complete), founder requested extension of the drom scraper to walk per-complectation detail pages and capture six field groups (identity / pricing / drivetrain / dimensions / comfort / tires) per trim. Inserted as Phase 01.1 between Phase 01 and Phase 02 — fully local, no infra dependency, parallelisable with Phase 02 calendar work. Scoped to BMW-only pilot (~2000 per-comp pages, 5–7h continuous) per SPEC R-4; multi-brand expansion deferred to v1.x. 9 plans across 6 waves; SPEC.md (R-1..R-8, ambiguity 0.13), CONTEXT.md (D-01..D-08), RESEARCH.md, PATTERNS.md, VALIDATION.md all locked 2026-04-29.
+
 ---
-*Last updated: 2026-04-27 — phase reorder by orchestrator*
+*Last updated: 2026-04-29 — Phase 01.1 plans landed by gsd-planner*
 *Original roadmap: 2026-04-26 — initial creation by gsd-roadmapper*
