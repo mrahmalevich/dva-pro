@@ -51,13 +51,13 @@
 - [x] 01-07-PLAN.md — Drom DOM parsers + orchestrator + integration test (SCRAPE-05, SCRAPE-09)
 - [x] 01-08-PLAN.md — SCHEMA.md + README.md docs (Phase 3 handoff)
 - [x] 01-09-PLAN.md — Live drom smoke run gate (manual, gates Phase 1 completion)
-- [ ] 01-10-PLAN.md — Cursor sort-before-compare + -1-throw guards (CR-01/02/03 fix)
-- [ ] 01-11-PLAN.md — Cursor zod schema + CorruptCursorError (WR-04 fix)
-- [ ] 01-12-PLAN.md — CR-04 contract: re-scrape cursored brand + README crash-recovery rewrite
-- [ ] 01-13-PLAN.md — Resume-path integration tests (cursor LOGIC under cursor-present assumption; IN-07)
-- [ ] 01-14-PLAN.md — Image_paths reconciliation + parse/image error split + bounded image-failure abort (CR-05/06)
-- [ ] 01-15-PLAN.md — Per-run HTML viewer auto-emitted by orchestrator + shared report-html module
-- [ ] 01-16-PLAN.md — Brand-root cursor path for cross-invocation resume (BLOCKER 1 follow-up)
+- [x] 01-10-PLAN.md — Cursor sort-before-compare + -1-throw guards (CR-01/02/03 fix)
+- [x] 01-11-PLAN.md — Cursor zod schema + CorruptCursorError (WR-04 fix)
+- [x] 01-12-PLAN.md — CR-04 contract: re-scrape cursored brand + README crash-recovery rewrite
+- [x] 01-13-PLAN.md — Resume-path integration tests (cursor LOGIC under cursor-present assumption; IN-07)
+- [x] 01-14-PLAN.md — Image_paths reconciliation + parse/image error split + bounded image-failure abort (CR-05/06)
+- [x] 01-15-PLAN.md — Per-run HTML viewer auto-emitted by orchestrator + shared report-html module
+- [x] 01-16-PLAN.md — Brand-root cursor path for cross-invocation resume (BLOCKER 1 follow-up)
 **Complexity:** M — narrowed scope (one real scraper + 4 stubs + shared plumbing) makes this smaller than the original Phase 5 design
 **Research-spike:** YES — drom.ru/catalog access route check (`baza.drom.ru/help/API` partner API vs polite scrape — within <1wk / <$100/mo rule); Crawlee CheerioCrawler patterns for resumable backfill; sharp WebP encoding settings for dimension preservation
 **Parallelisable with:** Phase 2 (Compliance & Infra) — no shared dependency surface; founder content collection
