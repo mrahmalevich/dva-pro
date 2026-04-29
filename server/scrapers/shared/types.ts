@@ -35,11 +35,13 @@ export type ReportSummary = {
   models_updated: number;
   images_downloaded: number;
   images_skipped: number;
-  errors: { url: string; message: string }[];
+  images_failed: number;
+  errors: { url: string; message: string; kind: 'parse' | 'image' | 'orchestrator' | 'inherit' }[];
   rate_limit_hits: number;
   blocked_responses: number;
   fx_stale: boolean;
   cursor_resumed: boolean;
+  image_failure_rate: number;
   final_status: 'ok' | 'blocked' | 'error';
 };
 
