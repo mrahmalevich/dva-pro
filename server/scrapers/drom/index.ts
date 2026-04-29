@@ -194,6 +194,10 @@ export const drom: IScraper = {
     const runId = makeRunId();
     const runRoot = resolve(RUN_ROOT_REL);
     const runDir = resolve(runRoot, runId);
+    // Cursor lives at the brand-root path (plan 01-16) — NOT inside the per-run
+    // runDir (which is fresh per invocation and would defeat cross-invocation
+    // resume). Computed once here and passed to every cursor call site below.
+    const cursorPath = resolve(runRoot, '.cursor.json');
     const brandAliasesPath = resolve(runRoot, 'brand-aliases.json');
     const detector = new BlockDetector();
     const report: ReportSummary = emptyReport(startedAt);
@@ -226,7 +230,7 @@ export const drom: IScraper = {
       // (IScraper in shared/types.ts). Validated by 01-13 resume integration
       // test 'returns status=error when readCursor throws CorruptCursorError'.
       if (opts.resume) {
-        cursor = await readCursor(runDir);
+        cursor = await readCursor(cursorPath);
         report.cursor_resumed = cursor !== null;
       }
 
@@ -398,7 +402,9 @@ export const drom: IScraper = {
           }
 
           // Per-model checkpoint after every model — D-15 brand-boundary granularity.
-          await writeCursor(runDir, {
+          // Cursor lives at the brand-root path (plan 01-16) so cross-invocation
+          // resume works: run N+1 reads what run N wrote.
+          await writeCursor(cursorPath, {
             lastBrandSlug: brand.brand_slug,
             lastModelSlug: model.model_slug,
             completedAt: new Date().toISOString(),
@@ -463,7 +469,7 @@ export const drom: IScraper = {
         );
       });
       await pointCurrentAt(runDir);
-      await deleteCursor(runDir);
+      await deleteCursor(cursorPath);
 
       return {
         status: 'ok',
