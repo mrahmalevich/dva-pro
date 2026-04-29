@@ -22,6 +22,25 @@ if (!sourceArg || !SCRAPERS[sourceArg]) {
   process.exit(1);
 }
 
+if (sourceArg === 'drom' && process.argv[3] === '--capture-fixture') {
+  const compId = process.argv[4];
+  if (!compId || !/^\d+$/.test(compId)) {
+    console.error('Usage: pnpm scrape drom --capture-fixture <comp_id>');
+    process.exit(1);
+  }
+  const { fetchHtml } = await import('./shared/http.js');
+  const { writeFile, mkdir } = await import('node:fs/promises');
+  const { resolve } = await import('node:path');
+  const url = `https://www.drom.ru/catalog/bmw/x5/${compId}/`;
+  const html = await fetchHtml(url);
+  const outDir = resolve('server/tests/fixtures/drom/complectation');
+  await mkdir(outDir, { recursive: true });
+  const out = resolve(outDir, `${compId}.html`);
+  await writeFile(out, html, 'utf-8');
+  console.log(`Wrote ${html.length} bytes to ${out}`);
+  process.exit(0);
+}
+
 let result: ScrapeResult;
 try {
   result = await SCRAPERS[sourceArg].run({ resume: true });
