@@ -20,3 +20,5 @@ data/scraped/fx/cbr-*.json
 !data/scraped/drom/brand-aliases.json
 # Phase 01 — pnpm migration
 package-lock.json
+# Phase 01.1 — screenshot diff PNGs (operator-inspection-only; never committed)
+server/tests/__snapshots__/*.diff.png
