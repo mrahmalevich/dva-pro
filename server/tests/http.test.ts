@@ -168,3 +168,61 @@ describe('politeDelay (D-14)', () => {
     }
   });
 });
+
+describe('dromClient cookie strip (D-09..D-11)', () => {
+  // Regression test for Gap 1 / VERIFICATION.md:
+  // npsPayload accumulates ~8KB across a long crawl and causes HTTP 431 on drom's nginx.
+  // The beforeRequest hook in http.ts must strip exactly the three bloat cookies from the
+  // outgoing Cookie header while preserving affinity / region cookies.
+
+  it('strips npsPayload, npsType, showNPS from outgoing Cookie header', async () => {
+    let seenCookieHeader = '';
+    const { server, port } = await startTestServer((req, res) => {
+      seenCookieHeader = String(req.headers['cookie'] ?? '');
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end('<html>ok</html>');
+    });
+    try {
+      // Inject bloat cookies + one affinity cookie directly into the request headers.
+      // We bypass the cookie jar here so we can control exactly what arrives at the
+      // outgoing-header stage where the beforeRequest hook operates.
+      await dromClient.get(`http://127.0.0.1:${port}/`, {
+        responseType: 'text',
+        headers: {
+          cookie: 'ring=abc123; npsPayload=AAAA; npsType=survey; showNPS=1; cookie_cityid=54',
+        },
+      });
+      // Affinity + region cookies MUST survive
+      expect(seenCookieHeader).toContain('ring=abc123');
+      expect(seenCookieHeader).toContain('cookie_cityid=54');
+      // Bloat cookies MUST be absent
+      expect(seenCookieHeader).not.toContain('npsPayload');
+      expect(seenCookieHeader).not.toContain('npsType');
+      expect(seenCookieHeader).not.toContain('showNPS');
+    } finally {
+      server.close();
+    }
+  }, 15_000);
+
+  it('passes Cookie header unchanged when no bloat cookies are present', async () => {
+    let seenCookieHeader = '';
+    const { server, port } = await startTestServer((req, res) => {
+      seenCookieHeader = String(req.headers['cookie'] ?? '');
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end('<html>ok</html>');
+    });
+    try {
+      await dromClient.get(`http://127.0.0.1:${port}/`, {
+        responseType: 'text',
+        headers: {
+          cookie: 'ring=xyz; segSession=sess1; PHPSESSID=abc',
+        },
+      });
+      expect(seenCookieHeader).toContain('ring=xyz');
+      expect(seenCookieHeader).toContain('segSession=sess1');
+      expect(seenCookieHeader).toContain('PHPSESSID=abc');
+    } finally {
+      server.close();
+    }
+  }, 15_000);
+});
