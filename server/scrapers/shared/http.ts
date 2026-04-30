@@ -25,6 +25,17 @@ const httpLimit = pLimit(1); // D-14: serial HTTP
 const limiter = new ProbeDownLimiter();
 const JITTER_RATIO = 0.20; // D-14: ±20%
 
+/**
+ * D-09 / D-11: Denylist of cookies drom's feedback widget sets on every /catalog/* visit.
+ * `npsPayload` is a base64-encoded list of component IDs that grows ~unboundedly across a
+ * long crawl; once its value exceeds ~8KB the full Cookie header triggers nginx HTTP 431.
+ * `npsType` and `showNPS` are companion flags from the same widget. Strip all three from
+ * the outgoing header on every request. Affinity and region cookies are NOT in this set
+ * and continue to flow untouched (ring, segSession, PHPSESSID, cookie_cityid, cookie_regionid,
+ * my_geo, dr_df, veryFirstHit).
+ */
+const STRIP_COOKIES = new Set(['npsPayload', 'npsType', 'showNPS']);
+
 let lastRequestAt = 0;
 
 /**
@@ -57,6 +68,24 @@ export const dromClient = got.extend({
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
     'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.7',
     Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  },
+  hooks: {
+    // D-10: Strip bloat cookies from the outgoing Cookie header before got sends the request.
+    // The cookie jar (tough-cookie) is left untouched — only the header projection changes.
+    beforeRequest: [
+      (options) => {
+        const raw = options.headers['cookie'];
+        if (!raw) return;
+        const filtered = String(raw)
+          .split(/;\s*/)
+          .filter((pair) => {
+            const name = pair.split('=')[0].trim();
+            return !STRIP_COOKIES.has(name);
+          })
+          .join('; ');
+        options.headers['cookie'] = filtered;
+      },
+    ],
   },
 });
 
