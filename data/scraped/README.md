@@ -83,6 +83,48 @@ After a successful run, `data/scraped/drom/current/` atomically points at the ne
 - `p-limit(1)` for HTTP fetches; `p-limit(4)` for sharp WebP encoding.
 - Total expected runtime for full backfill: **1–2 weeks**.
 
+### Filtering (env vars)
+
+Three independent env vars compose with AND semantics — set any combination to scope a run without modifying code. Unset/empty = no filter.
+
+| Env var | Type | Effect |
+|---------|------|--------|
+| `DROM_BRAND_WHITELIST` | comma-separated `brand_slug` list (lowercased) | Only listed brands are visited. Brands not on the list are skipped before the brand loop iterates. |
+| `DROM_MODEL_WHITELIST` | comma-separated `model_slug` list (lowercased) | Within each visited brand, only listed models are visited. Applied BEFORE the alphabetic sort + cursor lookup. |
+| `DROM_MIN_PRODUCTION_YEAR` | integer (e.g. `2015`) | Drop generations whose `year_to` is non-null AND strictly less than the cutoff. `year_to === null` (still in production, "н.в.") is ALWAYS kept. Inclusive boundary at the cutoff. Invalid (non-integer) values log a warning and are treated as unset — the run does NOT abort on operator typo. |
+
+Each run logs a single startup line summarizing the active filters:
+
+```text
+[drom] filters: brands=[bmw,lada], models=[x5], minYearTo=2015
+```
+
+Empty arrays render as `all`; an unset year cutoff renders as `none`.
+
+Examples:
+
+```bash
+# Just BMW
+DROM_BRAND_WHITELIST=bmw pnpm scrape:drom
+
+# Just BMW X5 (composes with brand whitelist)
+DROM_BRAND_WHITELIST=bmw DROM_MODEL_WHITELIST=x5 pnpm scrape:drom
+
+# All brands but only generations still in production OR ending in 2015+
+DROM_MIN_PRODUCTION_YEAR=2015 pnpm scrape:drom
+
+# All three composed: BMW X5 generations from 2018 onwards
+DROM_BRAND_WHITELIST=bmw DROM_MODEL_WHITELIST=x5 DROM_MIN_PRODUCTION_YEAR=2018 pnpm scrape:drom
+```
+
+Generations dropped by the year cutoff log:
+
+```text
+[drom] skipping generation bmw/x5/g_2007_4321 (year_to=2014 < 2018)
+```
+
+Cursor-drift behaviour: if `.cursor.json` references a brand or model that the current filter set excludes, the orchestrator throws loudly (`Refusing silent restart`). Delete `.cursor.json` explicitly to start over.
+
 ### Crash recovery (D-15) — resume contract
 
 If a `pnpm scrape:drom` run dies mid-brand, the next invocation reads `.cursor.json` and **re-scrapes the cursored brand from scratch** while preserving the prior successful run's data verbatim. The full contract:

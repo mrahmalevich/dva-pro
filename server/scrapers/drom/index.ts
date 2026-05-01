@@ -281,6 +281,49 @@ export const drom: IScraper = {
         a.brand_slug.localeCompare(b.brand_slug),
       );
 
+      // Optional model whitelist via env var (mirrors DROM_BRAND_WHITELIST).
+      // Comma-separated model_slug list, lowercased. Unset/empty = all models.
+      // Applied in the model loop AFTER parseModelList runs and BEFORE the
+      // alphabetic sort + cursor index lookup, so the cursor compares against
+      // the post-filter list (same shape as the brand filter above).
+      const modelWhitelist = (process.env.DROM_MODEL_WHITELIST ?? '')
+        .split(',')
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean);
+
+      // Optional minimum-production-year cutoff via env var.
+      // Integer; unset/empty/non-integer = no filter. Operator typo MUST NOT
+      // kill the run — log a warning and treat as unset.
+      // Applied in the generation loop AFTER parseGenerationPage returns:
+      //   keep iff year_to === null  (still in production, "н.в.")
+      //        OR year_to >= cutoff  (inclusive boundary)
+      //   drop iff year_to !== null && year_to < cutoff
+      const rawMinYear = process.env.DROM_MIN_PRODUCTION_YEAR ?? '';
+      let minProductionYearTo: number | null = null;
+      if (rawMinYear.trim().length > 0) {
+        const parsed = Number(rawMinYear.trim());
+        if (Number.isInteger(parsed)) {
+          minProductionYearTo = parsed;
+        } else {
+          // eslint-disable-next-line no-console
+          console.warn(
+            `[drom] DROM_MIN_PRODUCTION_YEAR='${rawMinYear}' is not a valid integer; ignoring (no year filter applied)`,
+          );
+        }
+      }
+
+      // Single startup log summarising every active filter so the operator can
+      // sanity-check before a multi-hour run.
+      {
+        const brandsLabel = whitelist.length > 0 ? `[${whitelist.join(',')}]` : 'all';
+        const modelsLabel = modelWhitelist.length > 0 ? `[${modelWhitelist.join(',')}]` : 'all';
+        const yearLabel = minProductionYearTo !== null ? String(minProductionYearTo) : 'none';
+        // eslint-disable-next-line no-console
+        console.log(
+          `[drom] filters: brands=${brandsLabel}, models=${modelsLabel}, minYearTo=${yearLabel}`,
+        );
+      }
+
       // Resume: skip brands lexicographically < lastBrandSlug.
       // Throw loudly when the cursored brand has vanished (drom removal or
       // whitelist exclusion) instead of silently restarting from index 0
@@ -311,10 +354,17 @@ export const drom: IScraper = {
         detector.inspect(brand.url, modelListHtml);
         report.pages_visited++;
         const parsedModels = parseModelList(modelListHtml, brand.url);
+        // Optional DROM_MODEL_WHITELIST filter, applied BEFORE the alphabetic sort
+        // + cursor lookup so the cursor compares against the post-filter list
+        // (same shape as DROM_BRAND_WHITELIST above).
+        const modelFiltered =
+          modelWhitelist.length > 0
+            ? parsedModels.filter((m) => modelWhitelist.includes(m.model_slug))
+            : parsedModels;
         // Sort alphabetically by model_slug so the cursor's lexicographic
         // comparison below is correct regardless of drom DOM order
         // (CR-02 / CR-03 fix per 01-REVIEW.md).
-        const models = [...parsedModels].sort((a, b) =>
+        const models = [...modelFiltered].sort((a, b) =>
           a.model_slug.localeCompare(b.model_slug),
         );
 
@@ -339,7 +389,9 @@ export const drom: IScraper = {
           if (idx === -1) {
             throw new Error(
               `Cursor.lastModelSlug='${c.lastModelSlug}' not present in current model list ` +
-                `for brand '${brand.brand_slug}'. Refusing silent restart of brand; ` +
+                `for brand '${brand.brand_slug}' ` +
+                `(removed from drom or filtered by DROM_BRAND_WHITELIST/DROM_MODEL_WHITELIST). ` +
+                `Refusing silent restart of brand; ` +
                 `delete .cursor.json explicitly to start over.`,
             );
           }
@@ -374,6 +426,22 @@ export const drom: IScraper = {
                 sourceUrl: gen.url,
                 heroImageUrl: gen.hero_image_url,
               });
+
+              // DROM_MIN_PRODUCTION_YEAR: drop generations whose year_to is non-null
+              // AND strictly less than the cutoff. year_to === null (still in
+              // production, "н.в.") is always kept. Inclusive boundary at the cutoff.
+              if (
+                minProductionYearTo !== null &&
+                record.year_to !== null &&
+                record.year_to < minProductionYearTo
+              ) {
+                // eslint-disable-next-line no-console
+                console.log(
+                  `[drom] skipping generation ${brand.brand_slug}/${model.model_slug}/${gen.generation_id} (year_to=${record.year_to} < ${minProductionYearTo})`,
+                );
+                continue; // skip seen.set, models_added++, BMW per-comp loop, hero image fetch
+              }
+
               const key = `${record.brand_slug}:${record.model_slug}:${record.generation}`;
               if (inheritedKeys.has(key)) {
                 report.models_updated++;
