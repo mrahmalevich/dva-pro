@@ -94,6 +94,14 @@ Plan: 9 of 9 (8 plans complete; plan 09 has tasks 1-3 committed, task 4 awaits o
 
 ---
 
+## Quick Tasks Completed
+
+| ID | Date | Description | Tests | Files |
+|----|------|-------------|-------|-------|
+| 260501-koe | 2026-05-01 | DROM_MODEL_WHITELIST + DROM_MIN_PRODUCTION_YEAR env-var filters for drom scraper | 161 → 164 | `server/scrapers/drom/index.ts`, `server/tests/drom-integration.test.ts`, `data/scraped/README.md` |
+
+---
+
 ## Accumulated Context
 
 ### Roadmap Evolution
