@@ -1406,3 +1406,291 @@ describe('Phase 01.1: BMW pilot per-comp integration (R-4, R-6, R-7)', () => {
     vi.doUnmock('../scrapers/shared/http.js');
   }, 180_000);
 });
+
+describe('drom orchestrator filters: DROM_MODEL_WHITELIST + DROM_MIN_PRODUCTION_YEAR (260501-koe)', () => {
+  it('DROM_MODEL_WHITELIST=x5 against multi-model brand → only x5 model is processed', async () => {
+    const heroJpeg = await readFile(FIXTURE_HERO);
+    const brandIndexHtml = await readFile(FIXTURE_BRAND_INDEX, 'utf-8');
+    const modelListHtml = await readFile(FIXTURE_MODEL_LIST, 'utf-8');
+    const genListHtml = await readFile(FIXTURE_GEN_LIST, 'utf-8');
+    const genPageHtml = await readFile(FIXTURE_GEN_PAGE, 'utf-8');
+
+    process.env.DROM_BRAND_WHITELIST = 'bmw';
+    process.env.DROM_MODEL_WHITELIST = 'x5';
+
+    // Reset prev current/ so this test is isolated from earlier tests.
+    const dromRoot = resolve(workDir, 'data/scraped/drom');
+    const { unlink } = await import('node:fs/promises');
+    if (existsSync(resolve(dromRoot, 'current'))) {
+      await unlink(resolve(dromRoot, 'current'));
+    }
+
+    vi.doMock('../scrapers/drom/parse-brand-index.js', () => ({
+      parseBrandIndex: () => [
+        { brand_slug: 'bmw', latin_name: 'BMW', url: 'https://www.drom.ru/catalog/bmw/' },
+      ],
+    }));
+    vi.doMock('../scrapers/drom/parse-model-list.js', () => ({
+      parseModelList: () => [
+        { model_slug: 'x5', ru_name: 'X5', latin_name: 'X5', url: 'https://www.drom.ru/catalog/bmw/x5/' },
+        { model_slug: '3-series', ru_name: '3 серии', latin_name: '3-Series', url: 'https://www.drom.ru/catalog/bmw/3-series/' },
+      ],
+    }));
+    vi.doMock('../scrapers/drom/parse-generation-list.js', () => ({
+      parseGenerationList: (_html: string, modelUrl: string) => [
+        {
+          generation_id: 'g_201808_8395',
+          generation_label: 'G05',
+          url: `${modelUrl}g_201808_8395/`,
+          hero_image_url: 'https://s.auto.drom.ru/i24222/c/photos/generations/500x_test.jpg',
+        },
+      ],
+    }));
+
+    const fetchedUrls: string[] = [];
+    vi.doMock('../scrapers/shared/http.js', () => ({
+      fetchHtml: async (url: string) => {
+        fetchedUrls.push(url);
+        if (/g_\d{4,6}_\d+\/?$/.test(url)) return genPageHtml;
+        const segs = url.replace(/^https?:\/\/www\.drom\.ru/, '').split('/').filter(Boolean);
+        if (segs[0] !== 'catalog') throw new Error(`Unexpected URL: ${url}`);
+        if (segs.length === 1) return brandIndexHtml;
+        if (segs.length === 2) return modelListHtml;
+        if (segs.length === 3) return genListHtml;
+        throw new Error(`Unexpected URL: ${url}`);
+      },
+      fetchBuffer: async (_url: string) => heroJpeg,
+      politeDelay: async () => {},
+      dromClient: { get: () => { throw new Error('dromClient should not be invoked'); } },
+    }));
+
+    vi.resetModules();
+    const { drom } = await import('../scrapers/drom/index.js');
+    const result = await drom.run({ resume: false });
+
+    expect(result.status).toBe('ok');
+    // No URL under /catalog/bmw/3-series/ should have been fetched —
+    // the model whitelist filtered it out before the model loop iterated.
+    expect(fetchedUrls.some((u) => u.includes('/catalog/bmw/3-series/'))).toBe(false);
+    // The x5 model-list page IS reached (it survived the whitelist).
+    expect(fetchedUrls.some((u) => u.includes('/catalog/bmw/x5/'))).toBe(true);
+
+    const models = JSON.parse(
+      await readFile(resolve(dromRoot, 'current/models.json'), 'utf-8'),
+    ) as Array<{ model_slug: string }>;
+    expect(models.length).toBe(1);
+    expect(models[0].model_slug).toBe('x5');
+
+    delete process.env.DROM_BRAND_WHITELIST;
+    delete process.env.DROM_MODEL_WHITELIST;
+  }, 60_000);
+
+  it('DROM_MIN_PRODUCTION_YEAR=2018: year_to=2017 dropped, year_to=2018 kept (inclusive boundary)', async () => {
+    const heroJpeg = await readFile(FIXTURE_HERO);
+    const brandIndexHtml = await readFile(FIXTURE_BRAND_INDEX, 'utf-8');
+    const modelListHtml = await readFile(FIXTURE_MODEL_LIST, 'utf-8');
+    const genListHtml = await readFile(FIXTURE_GEN_LIST, 'utf-8');
+
+    process.env.DROM_BRAND_WHITELIST = 'bmw';
+    process.env.DROM_MIN_PRODUCTION_YEAR = '2018';
+
+    const dromRoot = resolve(workDir, 'data/scraped/drom');
+    const { unlink } = await import('node:fs/promises');
+    if (existsSync(resolve(dromRoot, 'current'))) {
+      await unlink(resolve(dromRoot, 'current'));
+    }
+
+    vi.doMock('../scrapers/drom/parse-brand-index.js', () => ({
+      parseBrandIndex: () => [
+        { brand_slug: 'bmw', latin_name: 'BMW', url: 'https://www.drom.ru/catalog/bmw/' },
+      ],
+    }));
+    vi.doMock('../scrapers/drom/parse-model-list.js', () => ({
+      parseModelList: () => [
+        { model_slug: 'x5', ru_name: 'X5', latin_name: 'X5', url: 'https://www.drom.ru/catalog/bmw/x5/' },
+      ],
+    }));
+    vi.doMock('../scrapers/drom/parse-generation-list.js', () => ({
+      parseGenerationList: (_html: string, modelUrl: string) => [
+        {
+          generation_id: 'g_2017_old',
+          generation_label: 'OLD',
+          url: `${modelUrl}g_2017_old/`,
+          hero_image_url: 'https://s.auto.drom.ru/i24222/c/photos/generations/500x_old.jpg',
+        },
+        {
+          generation_id: 'g_2018_new',
+          generation_label: 'NEW',
+          url: `${modelUrl}g_2018_new/`,
+          hero_image_url: 'https://s.auto.drom.ru/i24222/c/photos/generations/500x_new.jpg',
+        },
+      ],
+    }));
+    // Stub parseGenerationPage so we can pin year_to per generation_id.
+    vi.doMock('../scrapers/drom/parse-generation-page.js', async () => {
+      const actual = await vi.importActual<typeof import('../scrapers/drom/parse-generation-page.js')>(
+        '../scrapers/drom/parse-generation-page.js',
+      );
+      return {
+        ...actual,
+        parseGenerationPage: (_html: string, ctx: import('../scrapers/drom/parse-generation-page.js').GenerationPageContext) => {
+          const yearTo = ctx.generation === 'g_2017_old' ? 2017 : 2018;
+          return {
+            brand: ctx.brand,
+            brand_slug: ctx.brand_slug,
+            model: ctx.model,
+            model_slug: ctx.model_slug,
+            generation: ctx.generation,
+            year_from: yearTo - 5,
+            year_to: yearTo,
+            body_types: ['джип'],
+            engine_options: [{ cc: 3000, hp: 249, fuel: 'diesel' as const }],
+            drive_options: ['AWD'],
+            description_ru: `stub description for ${ctx.generation}`,
+            price_min_rub: 5000000,
+            price_max_rub: 6000000,
+            image_paths: ctx.heroImageUrl ? [`images/${ctx.brand_slug}-${ctx.model_slug}-${ctx.generation}-hero.webp`] : [],
+            source: 'drom-catalog' as const,
+            source_url: ctx.sourceUrl,
+            scraped_at: new Date().toISOString(),
+            complectations: [],
+          };
+        },
+      };
+    });
+    vi.doMock('../scrapers/shared/http.js', () => ({
+      fetchHtml: async (url: string) => {
+        const segs = url.replace(/^https?:\/\/www\.drom\.ru/, '').split('/').filter(Boolean);
+        if (segs[0] !== 'catalog') throw new Error(`Unexpected URL: ${url}`);
+        if (segs.length === 1) return brandIndexHtml;
+        if (segs.length === 2) return modelListHtml;
+        if (segs.length === 3) return genListHtml;
+        return '<html></html>'; // gen pages — content irrelevant, parser is stubbed
+      },
+      fetchBuffer: async (_url: string) => heroJpeg,
+      politeDelay: async () => {},
+      dromClient: { get: () => { throw new Error('dromClient should not be invoked'); } },
+    }));
+
+    vi.resetModules();
+    const { drom } = await import('../scrapers/drom/index.js');
+    const result = await drom.run({ resume: false });
+
+    expect(result.status).toBe('ok');
+
+    const models = JSON.parse(
+      await readFile(resolve(dromRoot, 'current/models.json'), 'utf-8'),
+    ) as Array<{ generation: string; year_to: number | null }>;
+    const generations = models.map((m) => m.generation);
+    expect(generations).toContain('g_2018_new');     // inclusive boundary kept
+    expect(generations).not.toContain('g_2017_old'); // strictly below cutoff dropped
+    expect(models.length).toBe(1);
+
+    const reportJson = JSON.parse(
+      await readFile(resolve(dromRoot, 'current/report.json'), 'utf-8'),
+    );
+    expect(reportJson.models_added).toBe(1); // only the kept generation counts
+
+    delete process.env.DROM_BRAND_WHITELIST;
+    delete process.env.DROM_MIN_PRODUCTION_YEAR;
+  }, 60_000);
+
+  it('DROM_MIN_PRODUCTION_YEAR set: year_to=null (still in production) is always kept', async () => {
+    const heroJpeg = await readFile(FIXTURE_HERO);
+    const brandIndexHtml = await readFile(FIXTURE_BRAND_INDEX, 'utf-8');
+    const modelListHtml = await readFile(FIXTURE_MODEL_LIST, 'utf-8');
+    const genListHtml = await readFile(FIXTURE_GEN_LIST, 'utf-8');
+
+    process.env.DROM_BRAND_WHITELIST = 'bmw';
+    process.env.DROM_MIN_PRODUCTION_YEAR = '2030'; // deliberately high
+
+    const dromRoot = resolve(workDir, 'data/scraped/drom');
+    const { unlink } = await import('node:fs/promises');
+    if (existsSync(resolve(dromRoot, 'current'))) {
+      await unlink(resolve(dromRoot, 'current'));
+    }
+
+    vi.doMock('../scrapers/drom/parse-brand-index.js', () => ({
+      parseBrandIndex: () => [
+        { brand_slug: 'bmw', latin_name: 'BMW', url: 'https://www.drom.ru/catalog/bmw/' },
+      ],
+    }));
+    vi.doMock('../scrapers/drom/parse-model-list.js', () => ({
+      parseModelList: () => [
+        { model_slug: 'x5', ru_name: 'X5', latin_name: 'X5', url: 'https://www.drom.ru/catalog/bmw/x5/' },
+      ],
+    }));
+    vi.doMock('../scrapers/drom/parse-generation-list.js', () => ({
+      parseGenerationList: (_html: string, modelUrl: string) => [
+        {
+          generation_id: 'g_2020_inprod',
+          generation_label: 'IN-PROD',
+          url: `${modelUrl}g_2020_inprod/`,
+          hero_image_url: 'https://s.auto.drom.ru/i24222/c/photos/generations/500x_inprod.jpg',
+        },
+      ],
+    }));
+    vi.doMock('../scrapers/drom/parse-generation-page.js', async () => {
+      const actual = await vi.importActual<typeof import('../scrapers/drom/parse-generation-page.js')>(
+        '../scrapers/drom/parse-generation-page.js',
+      );
+      return {
+        ...actual,
+        parseGenerationPage: (_html: string, ctx: import('../scrapers/drom/parse-generation-page.js').GenerationPageContext) => ({
+          brand: ctx.brand,
+          brand_slug: ctx.brand_slug,
+          model: ctx.model,
+          model_slug: ctx.model_slug,
+          generation: ctx.generation,
+          year_from: 2020,
+          year_to: null, // still in production ("н.в.")
+          body_types: ['джип'],
+          engine_options: [{ cc: 3000, hp: 249, fuel: 'diesel' as const }],
+          drive_options: ['AWD'],
+          description_ru: 'stub description in-production',
+          price_min_rub: 5000000,
+          price_max_rub: 6000000,
+          image_paths: ctx.heroImageUrl ? [`images/${ctx.brand_slug}-${ctx.model_slug}-${ctx.generation}-hero.webp`] : [],
+          source: 'drom-catalog' as const,
+          source_url: ctx.sourceUrl,
+          scraped_at: new Date().toISOString(),
+          complectations: [],
+        }),
+      };
+    });
+    vi.doMock('../scrapers/shared/http.js', () => ({
+      fetchHtml: async (url: string) => {
+        const segs = url.replace(/^https?:\/\/www\.drom\.ru/, '').split('/').filter(Boolean);
+        if (segs[0] !== 'catalog') throw new Error(`Unexpected URL: ${url}`);
+        if (segs.length === 1) return brandIndexHtml;
+        if (segs.length === 2) return modelListHtml;
+        if (segs.length === 3) return genListHtml;
+        return '<html></html>';
+      },
+      fetchBuffer: async (_url: string) => heroJpeg,
+      politeDelay: async () => {},
+      dromClient: { get: () => { throw new Error('dromClient should not be invoked'); } },
+    }));
+
+    vi.resetModules();
+    const { drom } = await import('../scrapers/drom/index.js');
+    const result = await drom.run({ resume: false });
+
+    expect(result.status).toBe('ok');
+
+    const models = JSON.parse(
+      await readFile(resolve(dromRoot, 'current/models.json'), 'utf-8'),
+    ) as Array<{ generation: string; year_to: number | null }>;
+    expect(models.length).toBe(1);
+    expect(models[0].generation).toBe('g_2020_inprod');
+    expect(models[0].year_to).toBeNull();
+
+    const reportJson = JSON.parse(
+      await readFile(resolve(dromRoot, 'current/report.json'), 'utf-8'),
+    );
+    expect(reportJson.models_added).toBe(1);
+
+    delete process.env.DROM_BRAND_WHITELIST;
+    delete process.env.DROM_MIN_PRODUCTION_YEAR;
+  }, 60_000);
+});
