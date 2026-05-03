@@ -73,6 +73,10 @@ const fixtureModels: ModelRecord[] = [
           drive: 'AWD',
           transmission_type: 'AT',
           transmission_gears: 8,
+          // Phase 01.2 — golden snapshot pre-dates these fields; null preserves
+          // the previously-rendered byte-stable HTML (legacy data shape).
+          turbo: null, hybrid_type: null, battery_capacity_kwh: null,
+          electric_range_km: null, max_speed_kmh: null, acceleration_0_100_s: null,
         },
         dimensions: {
           length_mm: 4922,
@@ -84,6 +88,12 @@ const fixtureModels: ModelRecord[] = [
           trunk_max_l: 1860,
           curb_weight_kg: 2105,
           gross_weight_kg: 2890,
+          payload_kg: null,
+        },
+        chassis: {
+          suspension_front: null, suspension_rear: null,
+          brakes_front: null, brakes_rear: null,
+          steering_type: null,
         },
         comfort: {
           seats: 5,
@@ -94,6 +104,7 @@ const fixtureModels: ModelRecord[] = [
           tank_l: 80,
         },
         tires: { tires_front: '275/45 R20 110Y', tires_rear: '305/40 R20 112Y' },
+        features: [],
       },
       {
         identity: {
@@ -113,6 +124,8 @@ const fixtureModels: ModelRecord[] = [
           drive: 'AWD',
           transmission_type: 'AT',
           transmission_gears: 8,
+          turbo: null, hybrid_type: null, battery_capacity_kwh: null,
+          electric_range_km: null, max_speed_kmh: null, acceleration_0_100_s: null,
         },
         dimensions: {
           length_mm: 4922,
@@ -124,6 +137,12 @@ const fixtureModels: ModelRecord[] = [
           trunk_max_l: 1860,
           curb_weight_kg: 2150,
           gross_weight_kg: 2920,
+          payload_kg: null,
+        },
+        chassis: {
+          suspension_front: null, suspension_rear: null,
+          brakes_front: null, brakes_rear: null,
+          steering_type: null,
         },
         comfort: {
           seats: 5,
@@ -134,6 +153,7 @@ const fixtureModels: ModelRecord[] = [
           tank_l: 80,
         },
         tires: { tires_front: '275/45 R20 110Y', tires_rear: '305/40 R20 112Y' },
+        features: [],
       },
       {
         identity: {
@@ -153,6 +173,8 @@ const fixtureModels: ModelRecord[] = [
           drive: 'AWD',
           transmission_type: 'AT',
           transmission_gears: 8,
+          turbo: null, hybrid_type: null, battery_capacity_kwh: null,
+          electric_range_km: null, max_speed_kmh: null, acceleration_0_100_s: null,
         },
         dimensions: {
           length_mm: 4938,
@@ -164,6 +186,12 @@ const fixtureModels: ModelRecord[] = [
           trunk_max_l: 1860,
           curb_weight_kg: 2310,
           gross_weight_kg: 2810,
+          payload_kg: null,
+        },
+        chassis: {
+          suspension_front: null, suspension_rear: null,
+          brakes_front: null, brakes_rear: null,
+          steering_type: null,
         },
         comfort: {
           seats: 5,
@@ -174,6 +202,7 @@ const fixtureModels: ModelRecord[] = [
           tank_l: 80,
         },
         tires: { tires_front: '295/35 R21 107Y', tires_rear: '315/30 R22 111Y' },
+        features: [],
       },
     ],
   },
@@ -202,8 +231,12 @@ const fixtureReport: ReportSummary = {
     pricing: 0.85,
     drivetrain: 0.78,
     dimensions: 0.74,
+    // Phase 01.2 — chassis + features_density present in the type but
+    // unmaterialised in this fixture (Plan 04 will populate from real scrape).
+    chassis: 0,
     comfort: 0.81,
     tires: 0.71,
+    features_density: 0,
   },
 };
 

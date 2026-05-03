@@ -12,12 +12,20 @@ const makeAllNullComp = (): Complectation => ({
   drivetrain: {
     engine_cc: null, engine_hp: null, engine_fuel: null,
     drive: null, transmission_type: null, transmission_gears: null,
+    turbo: null, hybrid_type: null, battery_capacity_kwh: null,
+    electric_range_km: null, max_speed_kmh: null, acceleration_0_100_s: null,
   },
   dimensions: {
     length_mm: null, width_mm: null, height_mm: null,
     wheelbase_mm: null, clearance_mm: null,
     trunk_min_l: null, trunk_max_l: null,
     curb_weight_kg: null, gross_weight_kg: null,
+    payload_kg: null,
+  },
+  chassis: {
+    suspension_front: null, suspension_rear: null,
+    brakes_front: null, brakes_rear: null,
+    steering_type: null,
   },
   comfort: {
     seats: null, doors: null,
@@ -27,6 +35,7 @@ const makeAllNullComp = (): Complectation => ({
     tank_l: null,
   },
   tires: { tires_front: null, tires_rear: null },
+  features: [],
 });
 
 /** Build a Complectation with all leaves non-null (covers every group threshold). */
@@ -40,12 +49,24 @@ const makeAllPopulatedComp = (): Complectation => ({
   drivetrain: {
     engine_cc: 2993, engine_hp: 249, engine_fuel: 'diesel',
     drive: 'AWD', transmission_type: 'AT', transmission_gears: 8,
+    // Phase 01.2 — populated leaves still pass the existing 4-of-original-6 threshold;
+    // these extras don't affect coverage rates because thresholds were not raised.
+    turbo: true, hybrid_type: null, battery_capacity_kwh: null,
+    electric_range_km: null, max_speed_kmh: 230, acceleration_0_100_s: 6.5,
   },
   dimensions: {
     length_mm: 4922, width_mm: 2004, height_mm: 1745,
     wheelbase_mm: 2975, clearance_mm: 214,
     trunk_min_l: 645, trunk_max_l: 1860,
     curb_weight_kg: 2105, gross_weight_kg: 2890,
+    payload_kg: 785,
+  },
+  chassis: {
+    suspension_front: 'независимая, многорычажная',
+    suspension_rear: 'независимая, многорычажная',
+    brakes_front: 'дисковые вентилируемые',
+    brakes_rear: 'дисковые вентилируемые',
+    steering_type: 'реечный, с гидроусилителем',
   },
   comfort: {
     seats: 5, doors: 5,
@@ -55,6 +76,7 @@ const makeAllPopulatedComp = (): Complectation => ({
     tank_l: 80,
   },
   tires: { tires_front: '275/45 R20 110Y', tires_rear: '305/40 R20 112Y' },
+  features: [],
 });
 
 /** Wrap one or more Complectations into a ModelRecord container. */
@@ -80,23 +102,26 @@ const wrapAsRecords = (comps: Complectation[]): ModelRecord[] => [{
 }];
 
 describe('computeFieldCoverage (R-7 / D-05 / D-06 / D-08)', () => {
-  it('returns six zeros on empty records input', () => {
+  it('returns zeros across all groups (incl. chassis + features_density) on empty records input', () => {
     expect(computeFieldCoverage([])).toEqual({
-      identity: 0, pricing: 0, drivetrain: 0, dimensions: 0, comfort: 0, tires: 0,
+      identity: 0, pricing: 0, drivetrain: 0, dimensions: 0,
+      chassis: 0, comfort: 0, tires: 0, features_density: 0,
     });
   });
 
-  it('returns 1.0 across all groups for one fully-populated trim', () => {
+  it('returns 1.0 across all 0..1 groups + 0 features_density for one fully-populated trim with no features', () => {
     const records = wrapAsRecords([makeAllPopulatedComp()]);
     expect(computeFieldCoverage(records)).toEqual({
-      identity: 1, pricing: 1, drivetrain: 1, dimensions: 1, comfort: 1, tires: 1,
+      identity: 1, pricing: 1, drivetrain: 1, dimensions: 1,
+      chassis: 1, comfort: 1, tires: 1, features_density: 0,
     });
   });
 
   it('returns 0 across all groups for one all-null trim', () => {
     const records = wrapAsRecords([makeAllNullComp()]);
     expect(computeFieldCoverage(records)).toEqual({
-      identity: 0, pricing: 0, drivetrain: 0, dimensions: 0, comfort: 0, tires: 0,
+      identity: 0, pricing: 0, drivetrain: 0, dimensions: 0,
+      chassis: 0, comfort: 0, tires: 0, features_density: 0,
     });
   });
 
@@ -132,10 +157,13 @@ describe('computeFieldCoverage (R-7 / D-05 / D-06 / D-08)', () => {
 });
 
 describe('meetsCoverageGate (R-7)', () => {
-  it('returns true when all groups >= 0.70', () => {
+  it('returns true when all groups >= 0.70 (chassis + features_density on 0 floor)', () => {
     expect(meetsCoverageGate({
       identity: 0.92, pricing: 0.85, drivetrain: 0.78,
       dimensions: 0.74, comfort: 0.81, tires: 0.71,
+      // Phase 01.2: chassis + features_density floors are 0 in Plan 01;
+      // Plan 04 will tighten chassis ≥ 0.30 + features_density ≥ 50.
+      chassis: 0, features_density: 0,
     })).toBe(true);
   });
 
@@ -143,13 +171,15 @@ describe('meetsCoverageGate (R-7)', () => {
     expect(meetsCoverageGate({
       identity: 0.92, pricing: 0.85, drivetrain: 0.69,  // <0.70
       dimensions: 0.74, comfort: 0.81, tires: 0.71,
+      chassis: 0, features_density: 0,
     })).toBe(false);
   });
 
-  it('returns true at the exact 0.70 boundary', () => {
+  it('returns true at the exact 0.70 boundary (legacy groups)', () => {
     expect(meetsCoverageGate({
       identity: 0.70, pricing: 0.70, drivetrain: 0.70,
       dimensions: 0.70, comfort: 0.70, tires: 0.70,
+      chassis: 0, features_density: 0,
     })).toBe(true);
   });
 });

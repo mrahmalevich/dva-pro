@@ -1319,18 +1319,25 @@ describe('Phase 01.1: BMW pilot per-comp integration (R-4, R-6, R-7)', () => {
 
     expect(result.report.final_status).toBe('ok');
     // R-7: field_coverage must be emitted and shaped correctly.
+    // Phase 01.2 added `chassis` (0..1 rate) and `features_density` (mean count, ≥ 0).
     expect(result.report.field_coverage).toBeDefined();
     expect(Object.keys(result.report.field_coverage!).sort()).toEqual(
-      ['comfort', 'dimensions', 'drivetrain', 'identity', 'pricing', 'tires'],
+      ['chassis', 'comfort', 'dimensions', 'drivetrain', 'features_density', 'identity', 'pricing', 'tires'],
     );
-    // All 6 group rates must be numbers in [0, 1].
-    for (const rate of Object.values(result.report.field_coverage!)) {
+    // All 0..1 group rates must be numbers in [0, 1]; features_density is unbounded ≥ 0.
+    const RATE_GROUPS = ['identity', 'pricing', 'drivetrain', 'dimensions', 'chassis', 'comfort', 'tires'] as const;
+    for (const group of RATE_GROUPS) {
+      const rate = result.report.field_coverage![group];
       expect(rate).toBeGreaterThanOrEqual(0);
       expect(rate).toBeLessThanOrEqual(1);
     }
+    expect(result.report.field_coverage!.features_density).toBeGreaterThanOrEqual(0);
     // With controlled trim rows (all pricing populated) + real 207354.html fixture,
-    // all groups must meet the 0.70 threshold (gate passes → final_status=ok).
-    for (const [group, rate] of Object.entries(result.report.field_coverage!)) {
+    // all LEGACY groups must meet the 0.70 threshold (gate passes → final_status=ok).
+    // chassis + features_density are on a 0 floor in Plan 01 (Plan 04 will tighten).
+    const LEGACY_GROUPS_WITH_THRESHOLD = ['identity', 'drivetrain', 'dimensions', 'comfort', 'tires'] as const;
+    for (const group of LEGACY_GROUPS_WITH_THRESHOLD) {
+      const rate = result.report.field_coverage![group];
       expect(rate, `group '${group}' coverage`).toBeGreaterThanOrEqual(0.70);
     }
 

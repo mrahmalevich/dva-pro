@@ -10,11 +10,19 @@
 import type { ModelRecord, Complectation, FieldCoverage } from './types.js';
 
 // D-06 precomputed thresholds (no runtime ceil math):
+//
+// Phase 01.2 note: Drivetrain (12) and Dimensions (10) leaf counts grew, but the
+// thresholds are intentionally NOT raised for legacy back-compat. The new leaves
+// (turbo, hybrid_type, battery_*, payload_kg, etc.) are sparse on legacy gens
+// (most BMW X5 G05 trims have no hybrid/EV data), so requiring them in the
+// majority count would fail-soft on otherwise-valid records. Plan 04 will revisit
+// thresholds + floors based on real coverage telemetry from the Wave 2 re-scrape.
 const THRESHOLDS = {
   identity: 5,    // 7 leaves → ⌈2/3 × 7⌉ = 5
   pricing: 2,     // 2 leaves → 2 (effectively all)
-  drivetrain: 4,  // 6 leaves → 4
-  dimensions: 6,  // 9 leaves → 6
+  drivetrain: 4,  // 6 ORIGINAL leaves → 4 (kept post-01.2; new leaves don't raise floor)
+  dimensions: 6,  // 9 ORIGINAL leaves → 6 (kept post-01.2)
+  chassis: 4,     // 5 leaves → ⌈2/3 × 5⌉ = 4 (Phase 01.2)
   comfort: 4,     // 6 leaves → 4
   tires: 2,       // 2 leaves → 2 (effectively all)
 } as const;
@@ -41,21 +49,28 @@ function round2(n: number): number {
 /**
  * Compute per-group coverage rates across all complectations on the given records.
  * Each rate is the fraction of trims meeting the D-06 threshold for that group.
- * Rates are rounded to 2 dp.
+ * Rates are rounded to 2 dp. `features_density` is the mean number of feature
+ * entries per trim (≥ 0; not a 0..1 rate — see FieldCoverage JSDoc).
  */
 export function computeFieldCoverage(records: ModelRecord[]): FieldCoverage {
   const trims = records.flatMap((r) => r.complectations);
   const total = trims.length;
   if (total === 0) {
-    return { identity: 0, pricing: 0, drivetrain: 0, dimensions: 0, comfort: 0, tires: 0 };
+    return {
+      identity: 0, pricing: 0, drivetrain: 0, dimensions: 0,
+      chassis: 0, comfort: 0, tires: 0, features_density: 0,
+    };
   }
+  const featuresTotal = trims.reduce((acc, t) => acc + (t.features?.length ?? 0), 0);
   return {
     identity: round2(trims.filter((t) => trimMeetsThreshold(t, 'identity')).length / total),
     pricing: round2(trims.filter((t) => trimMeetsThreshold(t, 'pricing')).length / total),
     drivetrain: round2(trims.filter((t) => trimMeetsThreshold(t, 'drivetrain')).length / total),
     dimensions: round2(trims.filter((t) => trimMeetsThreshold(t, 'dimensions')).length / total),
+    chassis: round2(trims.filter((t) => trimMeetsThreshold(t, 'chassis')).length / total),
     comfort: round2(trims.filter((t) => trimMeetsThreshold(t, 'comfort')).length / total),
     tires: round2(trims.filter((t) => trimMeetsThreshold(t, 'tires')).length / total),
+    features_density: round2(featuresTotal / total),
   };
 }
 
@@ -79,8 +94,15 @@ const COVERAGE_FLOORS: Record<keyof FieldCoverage, number> = {
   pricing: 0.05,
   drivetrain: 0.70,
   dimensions: 0.70,
+  // Phase 01.2: chassis + features_density floors set to 0 here; Plan 04 will
+  // tighten to chassis ≥ 0.30 (sparse on legacy gens) and features_density ≥ 50
+  // (avg features.length per comp; catches parser regression). Floors of 0
+  // keep the gate semantically unchanged in Plan 01 — the schema can ship
+  // before parser/coverage are wired through.
+  chassis: 0,
   comfort: 0.70,
   tires: 0.70,
+  features_density: 0,
 };
 
 /** SPEC R-7: gate passes iff every group rate meets its floor. */

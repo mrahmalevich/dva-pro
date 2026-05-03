@@ -198,6 +198,13 @@ function extractDrivetrain($: cheerio.CheerioAPI, ctx: ComplectationPageContext)
     drive: tr.drive,
     transmission_type,
     transmission_gears,
+    // Phase 01.2 — extra typed slots; Plan 02 will populate from real DOM.
+    turbo: null,
+    hybrid_type: null,
+    battery_capacity_kwh: null,
+    electric_range_km: null,
+    max_speed_kmh: null,
+    acceleration_0_100_s: null,
   };
 }
 
@@ -216,6 +223,19 @@ function extractDimensions($: cheerio.CheerioAPI): Complectation['dimensions'] {
     trunk_max_l: trunk.max,
     curb_weight_kg: numFromLabel($, 'Масса, кг'),
     gross_weight_kg: numFromLabel($, 'Допустимая полная масса, кг'),
+    // Phase 01.2 — Plan 02 will populate from "Грузоподъёмность, кг" or similar label.
+    payload_kg: null,
+  };
+}
+
+// -- Chassis (per-comp HTML) — Phase 01.2 stub; Plan 02 populates --
+function extractChassis(_$: cheerio.CheerioAPI): Complectation['chassis'] {
+  return {
+    suspension_front: null,
+    suspension_rear: null,
+    brakes_front: null,
+    brakes_rear: null,
+    steering_type: null,
   };
 }
 
@@ -252,12 +272,20 @@ function allNullComplectation(ctx: ComplectationPageContext, errors: ExtractionE
     drivetrain: {
       engine_cc: null, engine_hp: null, engine_fuel: null,
       drive: null, transmission_type: null, transmission_gears: null,
+      turbo: null, hybrid_type: null, battery_capacity_kwh: null,
+      electric_range_km: null, max_speed_kmh: null, acceleration_0_100_s: null,
     },
     dimensions: {
       length_mm: null, width_mm: null, height_mm: null,
       wheelbase_mm: null, clearance_mm: null,
       trunk_min_l: null, trunk_max_l: null,
       curb_weight_kg: null, gross_weight_kg: null,
+      payload_kg: null,
+    },
+    chassis: {
+      suspension_front: null, suspension_rear: null,
+      brakes_front: null, brakes_rear: null,
+      steering_type: null,
     },
     comfort: {
       seats: null, doors: null,
@@ -267,6 +295,7 @@ function allNullComplectation(ctx: ComplectationPageContext, errors: ExtractionE
       tank_l: null,
     },
     tires: { tires_front: null, tires_rear: null },
+    features: [],
     _extraction_errors: errors.length > 0 ? errors : undefined,
   };
 }
@@ -293,12 +322,20 @@ export function parseComplectationPage(html: string, ctx: ComplectationPageConte
   const drivetrain = safeExtract(() => extractDrivetrain($, ctx), 'drivetrain', errors) ?? {
     engine_cc: null, engine_hp: null, engine_fuel: null,
     drive: null, transmission_type: null, transmission_gears: null,
+    turbo: null, hybrid_type: null, battery_capacity_kwh: null,
+    electric_range_km: null, max_speed_kmh: null, acceleration_0_100_s: null,
   };
   const dimensions = safeExtract(() => extractDimensions($), 'dimensions', errors) ?? {
     length_mm: null, width_mm: null, height_mm: null,
     wheelbase_mm: null, clearance_mm: null,
     trunk_min_l: null, trunk_max_l: null,
     curb_weight_kg: null, gross_weight_kg: null,
+    payload_kg: null,
+  };
+  const chassis = safeExtract(() => extractChassis($), 'chassis', errors) ?? {
+    suspension_front: null, suspension_rear: null,
+    brakes_front: null, brakes_rear: null,
+    steering_type: null,
   };
   const comfort = safeExtract(() => extractComfort($), 'comfort', errors) ?? {
     seats: null, doors: null,
@@ -310,7 +347,8 @@ export function parseComplectationPage(html: string, ctx: ComplectationPageConte
   };
 
   const candidate: Complectation = {
-    identity, pricing, drivetrain, dimensions, comfort, tires,
+    identity, pricing, drivetrain, dimensions, chassis, comfort, tires,
+    features: [],
     _extraction_errors: errors.length > 0 ? errors : undefined,
   };
 

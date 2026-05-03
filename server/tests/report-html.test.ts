@@ -66,6 +66,9 @@ const sampleModel: ModelRecord = {
         drive: 'AWD',
         transmission_type: 'AT',
         transmission_gears: 8,
+        // Phase 01.2 — null preserves byte-stable HTML golden snapshot.
+        turbo: null, hybrid_type: null, battery_capacity_kwh: null,
+        electric_range_km: null, max_speed_kmh: null, acceleration_0_100_s: null,
       },
       dimensions: {
         length_mm: 4922,
@@ -77,6 +80,12 @@ const sampleModel: ModelRecord = {
         trunk_max_l: 1860,
         curb_weight_kg: 2140,
         gross_weight_kg: 2760,
+        payload_kg: null,
+      },
+      chassis: {
+        suspension_front: null, suspension_rear: null,
+        brakes_front: null, brakes_rear: null,
+        steering_type: null,
       },
       comfort: {
         seats: 5,
@@ -87,6 +96,7 @@ const sampleModel: ModelRecord = {
         tank_l: 83,
       },
       tires: { tires_front: '275/45 R20 110Y', tires_rear: '275/45 R20 110Y' },
+      features: [],
     },
   ],
 };
@@ -107,7 +117,9 @@ const sampleReport: ReportSummary = {
   fx_stale: false,
   cursor_resumed: false,
   image_failure_rate: 0,
-  field_coverage: { identity: 0.92, pricing: 0.85, drivetrain: 0.78, dimensions: 0.74, comfort: 0.81, tires: 0.71 },
+  // Phase 01.2 — chassis + features_density added; values 0 to keep snapshot stable
+  // (Plan 03 viewer + Plan 04 coverage will start emitting real values).
+  field_coverage: { identity: 0.92, pricing: 0.85, drivetrain: 0.78, dimensions: 0.74, chassis: 0, comfort: 0.81, tires: 0.71, features_density: 0 },
   final_status: 'ok',
 };
 
