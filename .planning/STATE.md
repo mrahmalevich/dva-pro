@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-04-29T15:25:44.071Z"
+last_updated: "2026-05-03T04:54:21.558Z"
 progress:
   total_phases: 9
   completed_phases: 1
@@ -99,6 +99,7 @@ Plan: 9 of 9 (8 plans complete; plan 09 has tasks 1-3 committed, task 4 awaits o
 | ID | Date | Description | Tests | Files |
 |----|------|-------------|-------|-------|
 | 260501-koe | 2026-05-01 | DROM_MODEL_WHITELIST + DROM_MIN_PRODUCTION_YEAR env-var filters for drom scraper | 161 → 164 | `server/scrapers/drom/index.ts`, `server/tests/drom-integration.test.ts`, `data/scraped/README.md` |
+| 260503-gja | 2026-05-03 | Live progress (incremental `models.json` + per-loop `[drom]` logs) in drom orchestrator + wipe & restart for BMW X5 only | n/a | `server/scrapers/drom/index.ts`, `data/scraped/drom/*` |
 
 ---
 
