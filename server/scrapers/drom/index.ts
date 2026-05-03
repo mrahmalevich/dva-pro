@@ -178,6 +178,25 @@ async function inheritFromPrevCurrent(
   return { seen, inheritedImageCount, prevRunId };
 }
 
+/**
+ * Best-effort live snapshot of the in-progress `seen` map to `<runDir>/models.json`.
+ * Called from inside the gen + per-complectation loops so an operator can `jq length`
+ * the file and `tail -f` smoke.log to monitor multi-hour runs in real time.
+ *
+ * MUST be best-effort: a snapshot write failure is logged to `report.errors` (kind:
+ * 'orchestrator') but does NOT abort the run. The end-of-run final write at line 676
+ * is the authoritative one.
+ */
+async function snapshotModelsJson(
+  runDir: string,
+  seen: Map<string, ModelRecord>,
+): Promise<void> {
+  await atomicWriteFile(
+    resolve(runDir, 'models.json'),
+    JSON.stringify([...seen.values()], null, 2),
+  );
+}
+
 function emptyReport(startedAt: string): ReportSummary {
   return {
     started_at: startedAt,
@@ -346,6 +365,8 @@ export const drom: IScraper = {
       }
 
       for (let bi = startFromBrandIndex; bi < brands.length; bi++) {
+        // eslint-disable-next-line no-console
+        console.log(`[drom] brand ${bi + 1}/${brands.length}: ${brands[bi].brand_slug}`);
         const brand = brands[bi];
         const brandModels: Record<string, { ru: string; latin: string }> = {};
 
@@ -401,6 +422,8 @@ export const drom: IScraper = {
         }
 
         for (let mi = startFromModelIndex; mi < models.length; mi++) {
+          // eslint-disable-next-line no-console
+          console.log(`[drom]   model ${mi + 1}/${models.length}: ${models[mi].model_slug}`);
           const model = models[mi];
           brandModels[model.model_slug] = { ru: model.ru_name, latin: model.latin_name };
 
@@ -410,7 +433,14 @@ export const drom: IScraper = {
           report.pages_visited++;
           const gens = parseGenerationList(genListHtml, model.url);
 
+          // Live-progress accounting for the per-model summary log emitted after the gen loop.
+          const startModelsAdded = report.models_added;
+          const startModelsUpdated = report.models_updated;
+          let perModelComplectations = 0;
+
           for (const gen of gens) {
+            // eslint-disable-next-line no-console
+            console.log(`[drom]     gen ${gen.generation_id} (${gens.indexOf(gen) + 1}/${gens.length})`);
             // 5. Generation page → ModelRecord.
             const genPageHtml = await fetchHtml(gen.url);
             detector.inspect(gen.url, genPageHtml);
@@ -450,6 +480,17 @@ export const drom: IScraper = {
               }
               seen.set(key, record);
               modelsTouchedThisRun++;
+              await snapshotModelsJson(runDir, seen).catch((snapErr) => {
+                // eslint-disable-next-line no-console
+                console.error(
+                  `[drom] snapshot failed: ${snapErr instanceof Error ? snapErr.message : String(snapErr)}`,
+                );
+                report.errors.push({
+                  url: 'snapshot:gen',
+                  message: `snapshot: ${snapErr instanceof Error ? snapErr.message : String(snapErr)}`,
+                  kind: 'orchestrator',
+                });
+              });
 
               // ---- Phase 01.1: per-complectation deep-dive (BMW pilot only) ----
               if (BMW_PILOT_BRANDS.has(brand.brand_slug)) {
@@ -497,6 +538,8 @@ export const drom: IScraper = {
                     : 0;
 
                 for (let ci = startIndex; ci < enrichedTrimRows.length; ci++) {
+                  // eslint-disable-next-line no-console
+                  console.log(`[drom]       comp ${ci + 1}/${enrichedTrimRows.length}: ${enrichedTrimRows[ci].comp_id}`);
                   const trimRow = enrichedTrimRows[ci];
                   let compHtml: string;
                   try {
@@ -545,6 +588,18 @@ export const drom: IScraper = {
                   }
 
                   record.complectations.push(comp);
+                  await snapshotModelsJson(runDir, seen).catch((snapErr) => {
+                    // eslint-disable-next-line no-console
+                    console.error(
+                      `[drom] snapshot failed: ${snapErr instanceof Error ? snapErr.message : String(snapErr)}`,
+                    );
+                    report.errors.push({
+                      url: 'snapshot:comp',
+                      message: `snapshot: ${snapErr instanceof Error ? snapErr.message : String(snapErr)}`,
+                      kind: 'orchestrator',
+                    });
+                  });
+                  perModelComplectations++;
 
                   // D-02: cursor write per trim (no throttling)
                   await writeCursor(cursorPath, {
@@ -566,10 +621,14 @@ export const drom: IScraper = {
               const heroAbs = heroRel ? resolve(runDir, heroRel) : null;
               if (heroAbs && existsSync(heroAbs)) {
                 report.images_skipped++;
+                // eslint-disable-next-line no-console
+                console.log(`[drom]       image: skipped (inherited)`);
               } else if (gen.hero_image_url && heroRel) {
                 try {
                   await downloadAndConvert(gen.hero_image_url, heroRel, runDir);
                   report.images_downloaded++;
+                  // eslint-disable-next-line no-console
+                  console.log(`[drom]       image: downloaded`);
                 } catch (imgErr) {
                   report.images_failed++;
                   report.errors.push({
@@ -579,9 +638,13 @@ export const drom: IScraper = {
                   });
                   // CR-05: do not leave an orphan path in models.json.
                   record.image_paths = [];
+                  // eslint-disable-next-line no-console
+                  console.log(`[drom]       image: FAILED ${imgErr instanceof Error ? imgErr.message : String(imgErr)}`);
                 }
               } else {
                 report.images_skipped++;
+                // eslint-disable-next-line no-console
+                console.log(`[drom]       image: skipped (no source)`);
               }
             } catch (parseErr) {
               report.errors.push({
@@ -601,6 +664,13 @@ export const drom: IScraper = {
             lastComplectationIndex: null,    // D-03 reset at model boundary
             completedAt: new Date().toISOString(),
           });
+          // eslint-disable-next-line no-console
+          console.log(
+            `[drom]   done ${model.model_slug}: ` +
+              `${report.models_added - startModelsAdded} added, ` +
+              `${report.models_updated - startModelsUpdated} updated, ` +
+              `${perModelComplectations} complectations`,
+          );
         }
 
         // Brand fully done → merge brand-aliases entry (idempotent + sorted output).
