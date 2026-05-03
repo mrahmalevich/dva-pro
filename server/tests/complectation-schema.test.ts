@@ -7,6 +7,7 @@ import {
   Pricing,
   Drivetrain,
   Dimensions,
+  Chassis,
   Comfort,
   Tires,
 } from '../scrapers/shared/types.js';
@@ -20,12 +21,20 @@ const allNullComplectation = {
   drivetrain: {
     engine_cc: null, engine_hp: null, engine_fuel: null,
     drive: null, transmission_type: null, transmission_gears: null,
+    turbo: null, hybrid_type: null, battery_capacity_kwh: null,
+    electric_range_km: null, max_speed_kmh: null, acceleration_0_100_s: null,
   },
   dimensions: {
     length_mm: null, width_mm: null, height_mm: null,
     wheelbase_mm: null, clearance_mm: null,
     trunk_min_l: null, trunk_max_l: null,
     curb_weight_kg: null, gross_weight_kg: null,
+    payload_kg: null,
+  },
+  chassis: {
+    suspension_front: null, suspension_rear: null,
+    brakes_front: null, brakes_rear: null,
+    steering_type: null,
   },
   comfort: {
     seats: null, doors: null,
@@ -47,11 +56,16 @@ describe('Complectation zod schema (R-2, R-3)', () => {
     expect(() => Complectation.parse(missingDimensions)).toThrow();
   });
 
-  it('R-3: each group has the D-06 leaf count', () => {
+  it('R-3: each group has the D-06 leaf count (post Phase 01.2 extensions)', () => {
     expect(Object.keys(Identity.shape)).toHaveLength(7);
     expect(Object.keys(Pricing.shape)).toHaveLength(2);
-    expect(Object.keys(Drivetrain.shape)).toHaveLength(6);
-    expect(Object.keys(Dimensions.shape)).toHaveLength(9);
+    // Drivetrain: 6 original + 6 new (turbo, hybrid_type, battery_capacity_kwh,
+    // electric_range_km, max_speed_kmh, acceleration_0_100_s) = 12.
+    expect(Object.keys(Drivetrain.shape)).toHaveLength(12);
+    // Dimensions: 9 original + 1 new (payload_kg) = 10.
+    expect(Object.keys(Dimensions.shape)).toHaveLength(10);
+    // Chassis: new group, 5 leaves.
+    expect(Object.keys(Chassis.shape)).toHaveLength(5);
     expect(Object.keys(Comfort.shape)).toHaveLength(6);
     expect(Object.keys(Tires.shape)).toHaveLength(2);
   });
