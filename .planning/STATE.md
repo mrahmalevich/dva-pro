@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-05-03T07:06:58Z"
+last_updated: "2026-05-03T09:32:28.771Z"
 progress:
-  total_phases: 9
-  completed_phases: 1
-  total_plans: 25
-  completed_plans: 16
-  percent: 64
+  total_phases: 10
+  completed_phases: 2
+  total_plans: 32
+  completed_plans: 26
+  percent: 81
 ---
 
 # Project State: DVApro
@@ -48,7 +48,7 @@ progress:
 
 Phase: 01.1 (extend-drom-scrape-fields) — PAUSED at plan 09 BMW pilot manual gate
 Plan: 9 of 9 (8 plans complete; plan 09 has tasks 1-3 committed, task 4 awaits operator)
-**Status:** Paused — operator must run BMW pilot end-to-end (~5-7h, ~2000 drom requests)
+**Status:** Ready to execute
 
 **Wave summary:**
 
@@ -109,6 +109,7 @@ Plan: 9 of 9 (8 plans complete; plan 09 has tasks 1-3 committed, task 4 awaits o
 ### Roadmap Evolution
 
 - Phase 01.1 inserted after Phase 01: extend-drom-scrape-fields: full description, complectations, engine/fuel/transmission/dimensions/tires/weight per trim (URGENT)
+- Phase 01.2 inserted after Phase 1: extend-complectation-fields — capture all 8 drom comp tables via hybrid typed-core + features-bag schema, then re-scrape BMW X5 (URGENT)
 
 ### Decisions Logged (from PROJECT.md + research + reorder)
 
