@@ -157,13 +157,12 @@ describe('computeFieldCoverage (R-7 / D-05 / D-06 / D-08)', () => {
 });
 
 describe('meetsCoverageGate (R-7)', () => {
-  it('returns true when all groups >= 0.70 (chassis + features_density on 0 floor)', () => {
+  it('returns true when all groups >= 0.70 and chassis + features_density meet Plan 04 floors', () => {
     expect(meetsCoverageGate({
       identity: 0.92, pricing: 0.85, drivetrain: 0.78,
       dimensions: 0.74, comfort: 0.81, tires: 0.71,
-      // Phase 01.2: chassis + features_density floors are 0 in Plan 01;
-      // Plan 04 will tighten chassis ≥ 0.30 + features_density ≥ 50.
-      chassis: 0, features_density: 0,
+      // Phase 01.2 Plan 04: chassis ≥ 0.30, features_density ≥ 50 enforced.
+      chassis: 0.55, features_density: 120,
     })).toBe(true);
   });
 
@@ -171,15 +170,140 @@ describe('meetsCoverageGate (R-7)', () => {
     expect(meetsCoverageGate({
       identity: 0.92, pricing: 0.85, drivetrain: 0.69,  // <0.70
       dimensions: 0.74, comfort: 0.81, tires: 0.71,
-      chassis: 0, features_density: 0,
+      chassis: 0.55, features_density: 120,
     })).toBe(false);
   });
 
-  it('returns true at the exact 0.70 boundary (legacy groups)', () => {
+  it('returns true at the exact 0.70 boundary (legacy groups) with new floors satisfied', () => {
     expect(meetsCoverageGate({
       identity: 0.70, pricing: 0.70, drivetrain: 0.70,
       dimensions: 0.70, comfort: 0.70, tires: 0.70,
-      chassis: 0, features_density: 0,
+      chassis: 0.30, features_density: 50,
+    })).toBe(true);
+  });
+});
+
+// Phase 01.2 — chassis + features_density coverage
+//
+// Plan 04 promotes the two new floors from 0 (Plan 01 stub) to enforced
+// minimums. Coverage tests below pin the per-trim chassis threshold (4-of-5
+// non-null leaves), the features_density mean computation, and the
+// meetsCoverageGate boundary behaviour for both new floors.
+describe('Phase 01.2 — chassis + features_density coverage', () => {
+  // Helper: build a Complectation with `count` of the 5 chassis leaves populated.
+  const makeChassisCovered = (count: 0 | 1 | 2 | 3 | 4 | 5): Complectation => {
+    const c = makeAllNullComp();
+    const fields: Array<keyof Complectation['chassis']> = [
+      'suspension_front', 'suspension_rear', 'brakes_front', 'brakes_rear', 'steering_type',
+    ];
+    for (let i = 0; i < count; i++) c.chassis[fields[i]] = 'независимая, многорычажная';
+    return c;
+  };
+
+  // Helper: build a Complectation with N feature entries.
+  const makeCompWithNFeatures = (n: number): Complectation => {
+    const c = makeAllNullComp();
+    c.features = Array.from({ length: n }, (_, i) => ({
+      section: 'Test', subsection: null, label: 'L' + i, value: true,
+    }));
+    return c;
+  };
+
+  it('computeFieldCoverage returns chassis: 0 and features_density: 0 for empty records[]', () => {
+    expect(computeFieldCoverage([])).toEqual({
+      identity: 0, pricing: 0, drivetrain: 0, dimensions: 0,
+      chassis: 0, comfort: 0, tires: 0, features_density: 0,
+    });
+  });
+
+  it('chassis: trim with 4 of 5 leaves non-null counts as covered', () => {
+    const records = wrapAsRecords([makeChassisCovered(4)]);
+    expect(computeFieldCoverage(records).chassis).toBe(1);
+  });
+
+  it('chassis: trim with 3 of 5 leaves non-null does NOT count', () => {
+    const records = wrapAsRecords([makeChassisCovered(3)]);
+    expect(computeFieldCoverage(records).chassis).toBe(0);
+  });
+
+  it('chassis: trim with all 5 leaves non-null counts as covered', () => {
+    const records = wrapAsRecords([makeChassisCovered(5)]);
+    expect(computeFieldCoverage(records).chassis).toBe(1);
+  });
+
+  it('features_density: avg of 100, 50, 0 across 3 comps is 50.0', () => {
+    const records = wrapAsRecords([
+      makeCompWithNFeatures(100),
+      makeCompWithNFeatures(50),
+      makeCompWithNFeatures(0),
+    ]);
+    expect(computeFieldCoverage(records).features_density).toBe(50);
+  });
+
+  it('features_density: rounding to 2 dp', () => {
+    // 17 + 22 + 18 = 57 / 3 = 19.0 (exact)
+    const r1 = wrapAsRecords([
+      makeCompWithNFeatures(17),
+      makeCompWithNFeatures(22),
+      makeCompWithNFeatures(18),
+    ]);
+    expect(computeFieldCoverage(r1).features_density).toBe(19);
+
+    // 17 + 22 + 17 = 56 / 3 = 18.666..., rounds to 18.67
+    const r2 = wrapAsRecords([
+      makeCompWithNFeatures(17),
+      makeCompWithNFeatures(22),
+      makeCompWithNFeatures(17),
+    ]);
+    expect(computeFieldCoverage(r2).features_density).toBe(18.67);
+  });
+
+  it('meetsCoverageGate fails when chassis < 0.30', () => {
+    expect(meetsCoverageGate({
+      identity: 0.92, pricing: 0.85, drivetrain: 0.78,
+      dimensions: 0.74, comfort: 0.81, tires: 0.71,
+      chassis: 0.25,            // below floor
+      features_density: 120,
+    })).toBe(false);
+  });
+
+  it('meetsCoverageGate passes when chassis === 0.30 (boundary)', () => {
+    expect(meetsCoverageGate({
+      identity: 0.92, pricing: 0.85, drivetrain: 0.78,
+      dimensions: 0.74, comfort: 0.81, tires: 0.71,
+      chassis: 0.30,            // exact boundary, >= comparison
+      features_density: 120,
+    })).toBe(true);
+  });
+
+  it('meetsCoverageGate fails when features_density < 50', () => {
+    expect(meetsCoverageGate({
+      identity: 0.92, pricing: 0.85, drivetrain: 0.78,
+      dimensions: 0.74, comfort: 0.81, tires: 0.71,
+      chassis: 0.55,
+      features_density: 49.99,  // below floor
+    })).toBe(false);
+  });
+
+  it('meetsCoverageGate passes when features_density === 50 (boundary)', () => {
+    expect(meetsCoverageGate({
+      identity: 0.92, pricing: 0.85, drivetrain: 0.78,
+      dimensions: 0.74, comfort: 0.81, tires: 0.71,
+      chassis: 0.55,
+      features_density: 50,     // exact boundary
+    })).toBe(true);
+  });
+
+  it('meetsCoverageGate passes with locked BMW X5 production rates: chassis 0.35, features_density 142.3, pricing 0.084, others ≥ 0.70', () => {
+    expect(meetsCoverageGate({
+      identity: 0.95,
+      pricing: 0.084,           // matches drom-pricing-sparse 0.05 floor
+      drivetrain: 0.91,
+      dimensions: 0.88,
+      chassis: 0.35,
+      comfort: 0.79,
+      tires: 0.92,
+      features_density: 142.3,
     })).toBe(true);
   });
 });

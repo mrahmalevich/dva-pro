@@ -88,21 +88,32 @@ export function computeFieldCoverage(records: ModelRecord[]): FieldCoverage {
  * pricing from a second data source. We therefore pin pricing to a 0.05 floor
  * that still detects a regression to fully-null pricing while accepting drom's
  * actual data shape. All other groups keep the original 0.70 floor.
+ *
+ * Phase 01.2 additions (Plan 04 — Wave 2 tightening once parser produces real values):
+ *   - chassis: 0.30 — drom only populates suspension/brake type strings on
+ *     premium / late-model trims. Pre-2010 BMW X3 / Lada-tier comps frequently
+ *     have all-null chassis. ~30% of trims having a covered chassis group is
+ *     acceptable; a regression to 0 means the section walker missed
+ *     `Подвеска / Ходовая часть` entirely.
+ *   - features_density: 50 — average comp.features.length across all comps.
+ *     Distinct from the 0..1 group rates: this is a count, not a fraction
+ *     (per D-03 cross-phase contract; documented inline on FieldCoverage).
+ *     BMW X5 G05 surfaces ~150 features per comp; older gens have ~80; missing
+ *     one whole section drops by ~30. A floor of 50 catches a complete-walker
+ *     failure (→ 0) and most single-section regressions while permitting older /
+ *     sparser gens. The `>=` comparison in `meetsCoverageGate` works correctly
+ *     here despite the different units because both sides of the inequality
+ *     share dimension (count vs count, rate vs rate).
  */
 const COVERAGE_FLOORS: Record<keyof FieldCoverage, number> = {
   identity: 0.70,
   pricing: 0.05,
   drivetrain: 0.70,
   dimensions: 0.70,
-  // Phase 01.2: chassis + features_density floors set to 0 here; Plan 04 will
-  // tighten to chassis ≥ 0.30 (sparse on legacy gens) and features_density ≥ 50
-  // (avg features.length per comp; catches parser regression). Floors of 0
-  // keep the gate semantically unchanged in Plan 01 — the schema can ship
-  // before parser/coverage are wired through.
-  chassis: 0,
+  chassis: 0.30,           // Phase 01.2 Plan 04 — sparse on legacy gens; catches walker miss
   comfort: 0.70,
   tires: 0.70,
-  features_density: 0,
+  features_density: 50,    // Phase 01.2 Plan 04 — NUMERIC count floor, not a 0..1 rate
 };
 
 /** SPEC R-7: gate passes iff every group rate meets its floor. */

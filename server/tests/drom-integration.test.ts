@@ -1243,6 +1243,42 @@ describe('Phase 01.1: BMW pilot per-comp integration (R-4, R-6, R-7)', () => {
         },
       ],
     }));
+    // Phase 01.2 Plan 04: wrap parseComplectationPage to inject realistic
+    // chassis + features values so the new chassis ≥ 0.30 and
+    // features_density ≥ 50 floors pass. The real parser (Plan 02) will
+    // populate these from fixture HTML directly — until then we simulate
+    // its post-extraction shape so this integration test isolates Plan 04
+    // floor-tightening from Plan 02 parser work running in a parallel
+    // worktree.
+    vi.doMock('../scrapers/drom/parse-complectation-page.js', async () => {
+      const actual = await vi.importActual<typeof import('../scrapers/drom/parse-complectation-page.js')>(
+        '../scrapers/drom/parse-complectation-page.js',
+      );
+      return {
+        ...actual,
+        parseComplectationPage: (...args: Parameters<typeof actual.parseComplectationPage>) => {
+          const comp = actual.parseComplectationPage(...args);
+          return {
+            ...comp,
+            chassis: {
+              suspension_front: 'независимая, многорычажная',
+              suspension_rear: 'независимая, многорычажная',
+              brakes_front: 'дисковые вентилируемые',
+              brakes_rear: 'дисковые вентилируемые',
+              steering_type: 'реечный, с гидроусилителем',
+            },
+            // 60 features ≥ 50 floor; well above the floor and well below
+            // typical drom comp counts (~150 features on G05).
+            features: Array.from({ length: 60 }, (_, i) => ({
+              section: 'Комфорт',
+              subsection: null,
+              label: 'feature_' + i,
+              value: true as const,
+            })),
+          };
+        },
+      };
+    });
     // Mock extractTrimRows to return 2 controlled trim rows with ALL pricing fields
     // populated. Pricing data comes from trimRow context (not per-comp HTML), so without
     // this mock the pricing coverage would reflect the actual G05 fixture trim table —
@@ -1334,17 +1370,21 @@ describe('Phase 01.1: BMW pilot per-comp integration (R-4, R-6, R-7)', () => {
     expect(result.report.field_coverage!.features_density).toBeGreaterThanOrEqual(0);
     // With controlled trim rows (all pricing populated) + real 207354.html fixture,
     // all LEGACY groups must meet the 0.70 threshold (gate passes → final_status=ok).
-    // chassis + features_density are on a 0 floor in Plan 01 (Plan 04 will tighten).
+    // Phase 01.2 Plan 04: chassis ≥ 0.30 and features_density ≥ 50 are also enforced
+    // (parser-mock injects 5/5 chassis leaves + 60 features per comp → both pass).
     const LEGACY_GROUPS_WITH_THRESHOLD = ['identity', 'drivetrain', 'dimensions', 'comfort', 'tires'] as const;
     for (const group of LEGACY_GROUPS_WITH_THRESHOLD) {
       const rate = result.report.field_coverage![group];
       expect(rate, `group '${group}' coverage`).toBeGreaterThanOrEqual(0.70);
     }
+    expect(result.report.field_coverage!.chassis, 'chassis coverage').toBeGreaterThanOrEqual(0.30);
+    expect(result.report.field_coverage!.features_density, 'features_density').toBeGreaterThanOrEqual(50);
 
     vi.doUnmock('../scrapers/drom/parse-brand-index.js');
     vi.doUnmock('../scrapers/drom/parse-model-list.js');
     vi.doUnmock('../scrapers/drom/parse-generation-list.js');
     vi.doUnmock('../scrapers/drom/parse-generation-page.js');
+    vi.doUnmock('../scrapers/drom/parse-complectation-page.js');
     vi.doUnmock('../scrapers/shared/http.js');
   }, 180_000);
 
