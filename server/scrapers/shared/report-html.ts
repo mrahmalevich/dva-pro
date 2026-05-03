@@ -230,6 +230,38 @@ function renderHtml(data: {
     border-radius: 6px; font-size: 13px; text-decoration: none;
   }
   .modal a.source-link:hover { background: rgba(88,166,255,0.2); }
+  /* Complectation cards (clickable) + comp-detail topbar */
+  .comp-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px;
+  }
+  .comp-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    cursor: pointer; padding: 12px;
+    display: flex; flex-direction: column; gap: 6px;
+    text-align: left; font: inherit; color: inherit;
+    transition: border-color 120ms ease, transform 120ms ease;
+  }
+  .comp-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .comp-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .comp-back {
+    background: var(--panel); color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 4px 12px; border-radius: 6px;
+    width: auto; font-size: 13px; margin-right: 8px;
+    cursor: pointer;
+  }
+  .comp-back:hover { color: var(--fg); border-color: var(--accent); }
+  .comp-topbar {
+    position: sticky; top: 0; background: var(--panel);
+    padding: 12px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--border); z-index: 1;
+  }
+  .extraction-errors {
+    background: rgba(210,153,34,0.08); border: 1px solid var(--warn); color: var(--warn);
+    border-radius: 8px; padding: 10px 14px; margin-top: 16px;
+    font-size: 12px; font-family: ui-monospace, monospace; white-space: pre-wrap;
+  }
 </style>
 </head>
 <body>
@@ -287,6 +319,7 @@ function renderHtml(data: {
 <script>
   const data = JSON.parse(document.getElementById('data').textContent);
   const models = data.models;
+  let currentModel = null;  // set when a model modal opens; lets the comp-back button reopen it
 
   const brandSel = document.getElementById('brand');
   const bodySel = document.getElementById('body');
@@ -382,9 +415,17 @@ function renderHtml(data: {
   const modalContent = document.getElementById('modal-content');
 
   function openModal(m) {
+    currentModel = m;
     modalContent.innerHTML = renderModalBody(m);
     modal.classList.add('open');
     document.body.style.overflow = 'hidden';
+    // Wire comp-card click handlers (renderModalBody returns a string so we attach
+    // listeners after the DOM is in place).
+    const compButtons = modalContent.querySelectorAll('.comp-card[data-comp-index]');
+    compButtons.forEach(btn => {
+      const idx = parseInt(btn.dataset.compIndex, 10);
+      btn.addEventListener('click', () => openCompModal(m, m.complectations[idx]));
+    });
     // Focus the close button for keyboard users
     const closeBtn = modalContent.querySelector('.modal-close');
     if (closeBtn) closeBtn.focus();
@@ -394,6 +435,7 @@ function renderHtml(data: {
     modal.classList.remove('open');
     document.body.style.overflow = '';
     modalContent.innerHTML = '';
+    currentModel = null;
   }
 
   modal.addEventListener('click', (e) => {
@@ -402,6 +444,123 @@ function renderHtml(data: {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && modal.classList.contains('open')) closeModal();
   });
+
+  // ---- Comp-detail modal (260503-j62 Task 1) ----
+  // Renders a single complectation into the same #modal-content (no second backdrop).
+  // The "← Назад к модели" button re-opens the parent model modal, which also
+  // re-wires the comp-card click handlers (see openModal step).
+  function fuelRu(f) {
+    return ({ gas: 'бензин', diesel: 'дизель', hybrid: 'гибрид', electric: 'электро' })[f] || f || '';
+  }
+
+  // rows = Array<[label, value, opts?]>; if opts.html === true, value is treated as raw HTML.
+  // Skips rows whose value is null/undefined/''. Returns '' (no section) if zero rows survive.
+  function renderKvSection(title, rows) {
+    const live = rows.filter(r => r[1] !== null && r[1] !== undefined && r[1] !== '');
+    if (live.length === 0) return '';
+    let h = '<div class="modal-section"><h3>' + esc(title) + '</h3><dl class="kv">';
+    for (const r of live) {
+      const isHtml = r[2] && r[2].html === true;
+      h += '<dt>' + esc(r[0]) + '</dt><dd>' + (isHtml ? r[1] : esc(r[1])) + '</dd>';
+    }
+    h += '</dl></div>';
+    return h;
+  }
+
+  function openCompModal(model, comp) {
+    let html = '<div class="comp-topbar">';
+    html += '<button class="comp-back" type="button" aria-label="Назад к модели">← Назад к модели</button>';
+    html += '<button class="modal-close" type="button" aria-label="Закрыть">×</button>';
+    html += '</div>';
+
+    html += '<div class="modal-body">';
+    html += '<h2 class="modal-title">' + esc(comp.identity.name || '?') + '</h2>';
+    if (comp.identity.tier) {
+      html += '<div class="modal-subtitle"><span class="badge">' + esc(comp.identity.tier) + '</span></div>';
+    }
+
+    // Идентификация
+    const idRows = [];
+    idRows.push(['Название', comp.identity.name]);
+    let period = null;
+    if (comp.identity.period_from && comp.identity.period_to) {
+      period = comp.identity.period_from + ' – ' + comp.identity.period_to;
+    } else if (comp.identity.period_from) {
+      period = comp.identity.period_from;
+    } else if (comp.identity.period_to) {
+      period = comp.identity.period_to;
+    }
+    idRows.push(['Период', period]);
+    idRows.push(['Тариф', comp.identity.tier]);
+    idRows.push(['Код двигателя', comp.identity.engine_code]);
+    idRows.push(['Код кузова', comp.identity.frame_code]);
+    if (comp.identity.source_url) {
+      idRows.push(['Источник', '<a href="' + esc(comp.identity.source_url) + '" target="_blank" rel="noopener">' + esc(comp.identity.source_url) + '</a>', { html: true }]);
+    }
+    html += renderKvSection('Идентификация', idRows);
+
+    // Цена
+    html += renderKvSection('Цена', [
+      ['Новая', comp.pricing.price_new_rub != null ? formatPrice(comp.pricing.price_new_rub, null) : null],
+      ['Б/у от', comp.pricing.price_used_from_rub != null ? formatPrice(comp.pricing.price_used_from_rub, null) : null],
+    ]);
+
+    // Двигатель и привод
+    html += renderKvSection('Двигатель и привод', [
+      ['Объём', comp.drivetrain.engine_cc != null ? comp.drivetrain.engine_cc + ' см³' : null],
+      ['Мощность', comp.drivetrain.engine_hp != null ? comp.drivetrain.engine_hp + ' л.с.' : null],
+      ['Топливо', comp.drivetrain.engine_fuel ? fuelRu(comp.drivetrain.engine_fuel) : null],
+      ['Привод', comp.drivetrain.drive],
+      ['Коробка', comp.drivetrain.transmission_type],
+      ['Передач', comp.drivetrain.transmission_gears],
+    ]);
+
+    // Размеры
+    html += renderKvSection('Размеры', [
+      ['Длина', comp.dimensions.length_mm != null ? comp.dimensions.length_mm + ' мм' : null],
+      ['Ширина', comp.dimensions.width_mm != null ? comp.dimensions.width_mm + ' мм' : null],
+      ['Высота', comp.dimensions.height_mm != null ? comp.dimensions.height_mm + ' мм' : null],
+      ['Колёсная база', comp.dimensions.wheelbase_mm != null ? comp.dimensions.wheelbase_mm + ' мм' : null],
+      ['Клиренс', comp.dimensions.clearance_mm != null ? comp.dimensions.clearance_mm + ' мм' : null],
+      ['Багажник (мин)', comp.dimensions.trunk_min_l != null ? comp.dimensions.trunk_min_l + ' л' : null],
+      ['Багажник (макс)', comp.dimensions.trunk_max_l != null ? comp.dimensions.trunk_max_l + ' л' : null],
+      ['Снаряжённая масса', comp.dimensions.curb_weight_kg != null ? comp.dimensions.curb_weight_kg + ' кг' : null],
+      ['Полная масса', comp.dimensions.gross_weight_kg != null ? comp.dimensions.gross_weight_kg + ' кг' : null],
+    ]);
+
+    // Комфорт
+    html += renderKvSection('Комфорт', [
+      ['Места', comp.comfort.seats],
+      ['Двери', comp.comfort.doors],
+      ['Расход (город)', comp.comfort.fuel_consumption_city_l != null ? comp.comfort.fuel_consumption_city_l + ' л/100км' : null],
+      ['Расход (трасса)', comp.comfort.fuel_consumption_highway_l != null ? comp.comfort.fuel_consumption_highway_l + ' л/100км' : null],
+      ['Расход (смешанный)', comp.comfort.fuel_consumption_combined_l != null ? comp.comfort.fuel_consumption_combined_l + ' л/100км' : null],
+      ['Бак', comp.comfort.tank_l != null ? comp.comfort.tank_l + ' л' : null],
+    ]);
+
+    // Шины
+    html += renderKvSection('Шины', [
+      ['Передние', comp.tires.tires_front],
+      ['Задние', comp.tires.tires_rear],
+    ]);
+
+    // Extraction errors (warnings)
+    if (comp._extraction_errors && comp._extraction_errors.length > 0) {
+      html += '<div class="extraction-errors">';
+      html += comp._extraction_errors.map(err => esc(err.group + ': ' + err.message)).join('\n');
+      html += '</div>';
+    }
+
+    html += '</div>';
+
+    modalContent.innerHTML = html;
+    // Wire topbar buttons.
+    const backBtn = modalContent.querySelector('.comp-back');
+    if (backBtn) backBtn.addEventListener('click', () => openModal(model));
+    const closeBtn = modalContent.querySelector('.modal-close');
+    if (closeBtn) closeBtn.addEventListener('click', closeModal);
+    if (backBtn) backBtn.focus();
+  }
 
   function renderModalBody(m) {
     const heroImg = (m.image_paths && m.image_paths[0]) || null;
@@ -443,12 +602,14 @@ function renderHtml(data: {
       html += '</dl></div>';
     }
 
-    // Phase 01.1: complectations modal section (R-8)
+    // Phase 01.1: complectations modal section (R-8) — clickable buttons
+    // wired in openModal() after innerHTML is assigned (260503-j62 Task 1).
     if (m.complectations && m.complectations.length > 0) {
       html += '<div class="modal-section"><h3>Комплектации (' + m.complectations.length + ')</h3>';
-      html += '<div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px;">';
-      for (const c of m.complectations) {
-        html += '<div class="card" style="cursor: default; padding: 12px;">';
+      html += '<div class="comp-grid">';
+      for (let i = 0; i < m.complectations.length; i++) {
+        const c = m.complectations[i];
+        html += '<button class="comp-card" data-comp-index="' + i + '" type="button">';
         if (c.identity.tier) {
           html += '<div class="brand">' + esc(c.identity.tier) + '</div>';
         }
@@ -467,7 +628,7 @@ function renderHtml(data: {
           html += '<dt>Шины пер.</dt><dd>' + esc(c.tires.tires_front) + '</dd>';
         }
         html += '</dl>';
-        html += '</div>';
+        html += '</button>';
       }
       html += '</div></div>';
     }
