@@ -190,10 +190,13 @@ function extractCellValue(
   $: cheerio.CheerioAPI,
   td: CheerioWrapper,
 ): string | boolean | number | null {
-  // 1. yes/no SVG (drom uses `<use xlink:href="#yes"|"#no">`)
-  const useEl = td.find('use[xlink\\:href="#yes"], use[xlink\\:href="#no"]').first();
+  // 1. yes/no SVG. Drom emits `<use xlink:href="#yes"|"#no">` but cheerio v1.2
+  // (htmlparser2 default mode) normalises the namespaced attribute to plain
+  // `href` — confirmed empirically against fixture 207354. Match on `href`
+  // (works for both source forms after normalisation).
+  const useEl = td.find('use[href="#yes"], use[href="#no"]').first();
   if (useEl.length > 0) {
-    const href = useEl.attr('xlink:href') ?? '';
+    const href = useEl.attr('href') ?? '';
     if (href === '#yes') return true;
     if (href === '#no') return false;
   }
@@ -281,6 +284,136 @@ function walkSections($: cheerio.CheerioAPI): WalkedRow[] {
  */
 function isFeatureValue(v: unknown): v is string | boolean | number {
   return typeof v === 'string' || typeof v === 'boolean' || typeof v === 'number';
+}
+
+// -- Phase 01.2 Plan 02 — typed-slot mapping table --
+// Each entry maps a Russian label regex (tested against label.toLowerCase())
+// to a dotted `[group, leaf]` slot path on Complectation. Coerce funcs reject
+// the wrong runtime type (returning null) so we never write a string into a
+// number slot.
+//
+// All regexes are anchored at `^` and use bounded character classes — no
+// catastrophic backtracking (T-01.2-05 mitigation). Walker iterates over a
+// bounded ~167-row table, so total regex work is O(rows × mappings) ≈ 167×12.
+
+type SlotGroup = 'drivetrain' | 'dimensions' | 'chassis';
+type TypedSlotMapping = {
+  matcher: RegExp;
+  path: readonly [SlotGroup, string];
+  coerce: (v: string | boolean | number | null) => string | boolean | number | null;
+};
+
+const asBool = (v: unknown): boolean | null => (typeof v === 'boolean' ? v : null);
+const asNum = (v: unknown): number | null => (typeof v === 'number' ? v : null);
+const asStr = (v: unknown): string | null =>
+  typeof v === 'string' && v.length > 0 ? v : null;
+const asHybridType = (v: unknown): 'mild' | 'plug-in' | 'full' | null => {
+  if (typeof v !== 'string') return null;
+  if (/plug.?in|подключ|внешн/i.test(v)) return 'plug-in';
+  if (/mild|мягк/i.test(v)) return 'mild';
+  if (/^(full|полн|hybrid|гибрид)/i.test(v)) return 'full';
+  return null;
+};
+
+// Plan-specified label patterns adjusted to match the actual drom DOM observed
+// in fixture 207354.html (verified via grep):
+//   * The boolean turbo cell uses label "Нагнетатель" — not "Турбонаддув".
+//     ("Тип нагнетателя" → string "Турбина" stays in features[].)
+//   * Payload label is "Максимальная грузоподъёмность" with optional prefix.
+//   * Acceleration label is "Время разгона 0-100 км/ч, с".
+//   * Steering label may only appear as a subsection header on most trims —
+//     mapping kept for completeness, null is allowed by the schema.
+const TYPED_SLOT_MAPPINGS: ReadonlyArray<TypedSlotMapping> = [
+  // drivetrain
+  { matcher: /^нагнетатель$|^турбонаддув$|^наддув$/, path: ['drivetrain', 'turbo'], coerce: asBool },
+  { matcher: /^тип гибридной системы|^гибридная система|^тип гибрида/, path: ['drivetrain', 'hybrid_type'], coerce: asHybridType },
+  { matcher: /^ёмкость батареи|^объём батареи|^ёмкость аккумулятор|^ёмкость тягового аккумулятор/, path: ['drivetrain', 'battery_capacity_kwh'], coerce: asNum },
+  { matcher: /^запас хода на электро|^электрический запас хода|^запас хода \(электро/, path: ['drivetrain', 'electric_range_km'], coerce: asNum },
+  { matcher: /^максимальная скорость/, path: ['drivetrain', 'max_speed_kmh'], coerce: asNum },
+  { matcher: /^разгон 0.{1,5}100|^разгон до 100|^время разгона 0.{1,5}100/, path: ['drivetrain', 'acceleration_0_100_s'], coerce: asNum },
+  // dimensions
+  { matcher: /(^|\b)(максимальная )?грузоподъ[её]мность|^полезная нагрузка/, path: ['dimensions', 'payload_kg'], coerce: asNum },
+  // chassis
+  { matcher: /^передняя подвеска$|^тип передней подвески/, path: ['chassis', 'suspension_front'], coerce: asStr },
+  { matcher: /^задняя подвеска$|^тип задней подвески/, path: ['chassis', 'suspension_rear'], coerce: asStr },
+  { matcher: /^передние тормоза$|^тип передних тормоз/, path: ['chassis', 'brakes_front'], coerce: asStr },
+  { matcher: /^задние тормоза$|^тип задних тормоз/, path: ['chassis', 'brakes_rear'], coerce: asStr },
+  { matcher: /^тип рулевого управления|^рулевое управление$/, path: ['chassis', 'steering_type'], coerce: asStr },
+];
+
+/**
+ * Labels already extracted by per-label functions (extractDimensions,
+ * extractDrivetrain, extractComfort, extractTires) or by trimRow context —
+ * drop these from features[] to avoid duplication with the typed groups.
+ * Match against label.toLowerCase().
+ */
+const SUPPRESS_LABELS: ReadonlySet<string> = new Set([
+  // Identity (from trimRow, but if drom shows them, drop)
+  'название комплектации',
+  'период выпуска',
+  'тип привода',
+  'тип кузова',
+  'тип трансмиссии',
+  // Existing dimensions slots (extracted by extractDimensions)
+  'габариты кузова (д x ш x в), мм',
+  'колесная база, мм',
+  'клиренс (высота дорожного просвета), мм',
+  'объем багажника, л',
+  'масса, кг',
+  'допустимая полная масса, кг',
+  // Existing comfort slots
+  'число мест',
+  'число дверей',
+  'расход топлива в городском цикле, л/100 км',
+  'расход топлива за городом, л/100 км',
+  'расход топлива в смешанном цикле, л/100 км',
+  'объем топливного бака, л',
+  // Existing tire slots
+  'передние колеса',
+  'задние колеса',
+  'передние шины',
+  'задние шины',
+]);
+
+/**
+ * Apply walked rows: (a) populate typed slots in `slots`; (b) push remaining
+ * rows into `features` (skipping suppressed labels and null values).
+ * Mutates `slots` and `features` in place.
+ */
+function applyWalkedRows(
+  walked: ReadonlyArray<WalkedRow>,
+  slots: {
+    drivetrain: Complectation['drivetrain'];
+    dimensions: Complectation['dimensions'];
+    chassis: Complectation['chassis'];
+  },
+  features: Complectation['features'],
+): void {
+  for (const row of walked) {
+    const labelLower = row.label.toLowerCase();
+    let matched = false;
+    for (const m of TYPED_SLOT_MAPPINGS) {
+      if (m.matcher.test(labelLower)) {
+        const coerced = m.coerce(row.normalisedValue);
+        if (coerced !== null) {
+          const [group, leaf] = m.path;
+          (slots[group] as Record<string, unknown>)[leaf] = coerced;
+        }
+        matched = true;
+        break;
+      }
+    }
+    if (matched) continue;
+    if (SUPPRESS_LABELS.has(labelLower)) continue;
+    // Drop null cells silently (em-dash placeholders, empty values).
+    if (!isFeatureValue(row.normalisedValue)) continue;
+    features.push({
+      section: row.section,
+      subsection: row.subsection,
+      label: row.label,
+      value: row.normalisedValue,
+    });
+  }
 }
 
 // -- Identity (from trimRow context, NOT from per-comp HTML) --
@@ -476,9 +609,20 @@ export function parseComplectationPage(html: string, ctx: ComplectationPageConte
     tires_front: null, tires_rear: null,
   };
 
+  // Phase 01.2 Plan 02 — generic walker:
+  // (a) overlay typed-slot mappings on top of per-section extractor stubs,
+  // (b) push everything else into the open-ended features bag.
+  const features: Complectation['features'] = [];
+  const walked = safeExtract(() => walkSections($), 'walk-sections', errors) ?? [];
+  safeExtract(
+    () => applyWalkedRows(walked, { drivetrain, dimensions, chassis }, features),
+    'apply-walked-rows',
+    errors,
+  );
+
   const candidate: Complectation = {
     identity, pricing, drivetrain, dimensions, chassis, comfort, tires,
-    features: [],
+    features,
     _extraction_errors: errors.length > 0 ? errors : undefined,
   };
 
