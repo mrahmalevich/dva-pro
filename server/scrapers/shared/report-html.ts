@@ -547,7 +547,7 @@ function renderHtml(data: {
     // Extraction errors (warnings)
     if (comp._extraction_errors && comp._extraction_errors.length > 0) {
       html += '<div class="extraction-errors">';
-      html += comp._extraction_errors.map(err => esc(err.group + ': ' + err.message)).join('\n');
+      html += comp._extraction_errors.map(err => esc(err.group + ': ' + err.message)).join('<br>');
       html += '</div>';
     }
 
