@@ -579,11 +579,25 @@ function renderHtml(data: {
     html += '<div class="modal-subtitle">' + esc(m.generation) + ' · '
       + esc(m.year_from || '?') + '–' + esc(m.year_to || 'н.в.') + '</div>';
 
-    // Body types + price as badges
-    const badges = (m.body_types || []).map(b => '<span class="badge">' + esc(b) + '</span>');
-    if (priceSummary) badges.push('<span class="price-pill">' + esc(priceSummary) + '</span>');
-    if (badges.length) {
-      html += '<div class="modal-section badges-row">' + badges.join(' ') + '</div>';
+    // Обзор card — badges (body_types + price-pill) and quick counts (260503-j62 Task 2).
+    const overviewBadges = (m.body_types || []).map(b => '<span class="badge">' + esc(b) + '</span>');
+    if (priceSummary) overviewBadges.push('<span class="price-pill">' + esc(priceSummary) + '</span>');
+    const compCount = (m.complectations && m.complectations.length) || 0;
+    const engineCount = (m.engine_options && m.engine_options.length) || 0;
+    const driveCount = (m.drive_options && m.drive_options.length) || 0;
+    if (overviewBadges.length || compCount || engineCount || driveCount) {
+      html += '<div class="modal-section"><h3>Обзор</h3>';
+      if (overviewBadges.length) {
+        html += '<div class="badges-row" style="margin-bottom: 12px;">' + overviewBadges.join(' ') + '</div>';
+      }
+      const overviewRows = [];
+      if (compCount > 0) overviewRows.push('<dt>Комплектаций</dt><dd>' + compCount + '</dd>');
+      if (engineCount > 0) overviewRows.push('<dt>Двигателей</dt><dd>' + engineCount + '</dd>');
+      if (driveCount > 0) overviewRows.push('<dt>Привод</dt><dd>' + esc(m.drive_options.join(', ')) + '</dd>');
+      if (overviewRows.length) {
+        html += '<dl class="kv">' + overviewRows.join('') + '</dl>';
+      }
+      html += '</div>';
     }
 
     // Description (full)
@@ -591,13 +605,13 @@ function renderHtml(data: {
       html += '<div class="modal-section"><h3>Описание</h3><div class="desc-full">' + esc(m.description_ru) + '</div></div>';
     }
 
-    // Engine options
+    // Engine options — fixed renderer for {cc, hp, fuel} schema (260503-j62 Task 2).
     if (m.engine_options && m.engine_options.length) {
       html += '<div class="modal-section"><h3>Двигатели (' + m.engine_options.length + ')</h3><dl class="kv">';
       for (const e of m.engine_options) {
-        const label = [e.fuel, e.volume_l ? e.volume_l + ' л' : '', e.power_hp ? e.power_hp + ' л.с.' : '', e.transmission]
-          .filter(Boolean).join(' · ');
-        html += '<dt>' + esc(e.label || '') + '</dt><dd>' + esc(label || '—') + '</dd>';
+        const dt = (e.cc != null ? e.cc + ' см³' : '—');
+        const dd = [e.hp != null ? e.hp + ' л.с.' : null, fuelRu(e.fuel)].filter(Boolean).join(' · ') || '—';
+        html += '<dt>' + esc(dt) + '</dt><dd>' + esc(dd) + '</dd>';
       }
       html += '</dl></div>';
     }
@@ -631,13 +645,6 @@ function renderHtml(data: {
         html += '</button>';
       }
       html += '</div></div>';
-    }
-
-    // Drive options
-    if (m.drive_options && m.drive_options.length) {
-      html += '<div class="modal-section"><h3>Привод</h3><div class="badges-row">'
-        + m.drive_options.map(d => '<span class="badge">' + esc(d) + '</span>').join(' ')
-        + '</div></div>';
     }
 
     // Identity / metadata table
