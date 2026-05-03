@@ -77,10 +77,10 @@
 **Goal:** Extend the drom comp scraper to capture all fields from drom's 8 main complectation tables via a hybrid Strategy B schema (small typed core for compute-relevant values + a features bag for the remaining ~130 fields). Re-scrape BMW X5 so the next snapshot has complete data for Phase 03's importer.
 **Requirements:** none (TBD — urgent scaffolding for Phase 03; SCOPE.md acceptance criteria used as goal-backward must_haves)
 **Depends on:** Phase 1 (Phase 01.1's parser, orchestrator, cursor, polite-delay HTTP, per-run viewer)
-**Plans:** 6 plans across 3 waves
+**Plans:** 1/6 plans executed
 
 Plans:
-- [ ] 01.2-01-PLAN.md — Wave 1: Schema extension (drivetrain/dimensions typed slots + chassis group + features bag)
+- [x] 01.2-01-PLAN.md — Wave 1: Schema extension (drivetrain/dimensions typed slots + chassis group + features bag)
 - [ ] 01.2-02-PLAN.md — Wave 2: Generic section-walker parser (typed slots + features[] from 11 drom comp sections)
 - [ ] 01.2-03-PLAN.md — Wave 2: HTML viewer renders 8 native drom sections from features[] in comp-detail modal
 - [ ] 01.2-04-PLAN.md — Wave 2: Coverage gate adds chassis (>=0.30) + features_density (>=50) floors
