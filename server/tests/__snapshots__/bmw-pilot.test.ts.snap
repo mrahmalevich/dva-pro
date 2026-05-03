@@ -2,9 +2,11 @@
 
 exports[`BMW pilot field-coverage snapshot golden (R-8) > locks per-group coverage rates rounded to 2 dp 1`] = `
 {
+  "chassis": 0,
   "comfort": 1,
   "dimensions": 1,
   "drivetrain": 1,
+  "features_density": 0,
   "identity": 1,
   "pricing": 0,
   "tires": 1,
