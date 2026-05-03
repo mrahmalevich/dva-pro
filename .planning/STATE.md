@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-last_updated: "2026-05-03T09:34:41.053Z"
+status: paused
+last_updated: "2026-05-03T12:30:00Z"
 progress:
   total_phases: 10
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 32
-  completed_plans: 26
-  percent: 81
+  completed_plans: 32
+  percent: 100
 ---
 
 # Project State: DVApro
@@ -46,32 +46,29 @@ progress:
 
 ## Current Position
 
-Phase: 01.2 (extend-complectation-fields-capture-all-8-drom-comp-tables-v) — EXECUTING
-Plan: 1 of 6
-**Status:** Executing Phase 01.2
+Phase: 01.2 (extend-complectation-fields-capture-all-8-drom-comp-tables-v) — ✅ COMPLETE
+Plans: 6 of 6 complete (5 implemented + 1 deferred-with-rationale)
+**Status:** Phase 01.2 closed; awaiting next-phase decision (Phase 2 Compliance & Infra is the natural next step)
 
 **Wave summary:**
 
-- Wave 1 (4 plans): ✓ devDeps + fixtures (op), ✓ Complectation schema, ✓ ProbeDownLimiter, ✓ cursor field
-- Wave 2 (2 plans): ✓ coverage formula, ✓ fail-soft per-comp parser
-- Wave 3 (1 plan):  ✓ orchestrator wiring (BMW pilot loop, R-7 0.70 gate guarded by totalComplectations>0)
-- Wave 4 (1 plan):  ✓ HTML viewer (Комплектации section + 6 coverage tiles), bmw-pilot.test.ts snapshot
-- Wave 5 (1 plan):  ⏸ tasks 1-3 committed (puppeteer screenshot golden + SCHEMA.md + README.md); task 4 BMW pilot live run pending operator
+- Wave 1 (2 plans): ✓ Complectation schema (Strategy B hybrid: 7 typed slots + chassis group + features bag); ⏭ hybrid X5 fixture deferred — operator confirmed live re-scrape covers it (see `01.2-05-SUMMARY.md`)
+- Wave 2 (3 plans, parallel worktrees): ✓ generic section-walker parser (137 features on fixture 207354); ✓ HTML viewer renders 8 native drom sections with subsections + ✓/× glyphs + esc()-XSS hardening; ✓ coverage gate adds chassis (≥0.30) + features_density (≥50) floors
+- Wave 3 (1 plan, operator-monitored): ✓ live BMW X5 backfill — 38 generations × 477 complectations in ~56 min wall-clock, 0 errors, 0 rate-limit hits; all 8 coverage floors clear by wide margins (chassis 1.00, features_density 119.78)
 
-**Test state:** 159/159 passing (19 files), typecheck clean.
+**Test state:** 207/210 passing (19 files), 3 skipped (deferred hybrid-fixture tests), `pnpm typecheck:server` exits 0.
 
-**To resume after BMW pilot:**
+**Goal verification:** ✅ PASSED 4/4 acceptance criteria via gsd-verifier (see `01.2-VERIFICATION.md`).
 
-1. Run `pnpm scrape:drom` (5–7h, monitor for block-detection trips). Optionally clear cursor: `rm -f data/scraped/drom/.cursor.json` first.
-2. `cat data/scraped/drom/current/report.json | jq '.field_coverage, .final_status, .pages_visited, (.errors | length)'` — every coverage rate must be ≥ 0.70, `final_status === "ok"`.
-3. Visually open `data/scraped/drom/current/index.html` — confirm "Coverage" tiles in header + "Комплектации (N)" trim cards.
-4. Re-run `/gsd-execute-phase 01.1` to resume from the checkpoint — agent will see the SUMMARY status field, ask for the six rates, finalize SUMMARY.md, run code review + verification, mark phase complete.
+**Output:** `data/scraped/drom/current/` → `2026-05-03T11-33-51Z/` (38 gens, 477 comps, hybrid Strategy B schema fully populated).
 
-**If pilot fails (block detection, coverage gate failure):** open `/gsd-discuss-phase 01.1 --reopen` and document the failure mode before retrying.
+**Open follow-up (non-blocking, surfaced by verifier):**
 
-**Parallel work that can start immediately (independent of Phase 1):**
+- **`hybrid_type` regex mismatch** — drom's actual label is "Вид гибрида" (not "Тип гибридной системы" the plan assumed). 46 hybrid trims have `drivetrain.hybrid_type=null` while metadata still correctly lands in `features[]`. ~5-min regex fix; capture as a quick task before Phase 03's importer reads typed slots.
 
-- **Phase 2 prep** — Compliance & Infra. Roskomnadzor 5-day window + Unisender Go 14-day warm-up are calendar-bound; user can begin in parallel via `/gsd-discuss-phase 2`.
+**Parallel work that can start immediately:**
+
+- **Phase 2** — Compliance & Infra. Roskomnadzor 5-day window + Unisender Go 14-day warm-up are calendar-bound. Run `/gsd-discuss-phase 2`.
 - **Founder content collection** (биографии, фото, отзывы) — pure-content track, blocks Phase 7 launch credibility.
 
 ---
