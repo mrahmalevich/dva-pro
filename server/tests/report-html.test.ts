@@ -9,8 +9,14 @@
 //   5. The model data is embedded verbatim in a <script type="application/json"> block
 //      (data-embedding contract — pinned via brand_slug round-trip).
 //   6. The rendered HTML is byte-stable for a fixed input fixture (snapshot stability).
+//
+// Phase 01.2-03 additions: puppeteer-driven tests covering the comp-detail modal's
+// 8 native drom sections rendered from features[]. The modal HTML is produced by
+// runtime JS (openCompModal), so we actually exercise the script in headless Chromium
+// rather than asserting against the static index.html source.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import puppeteer from 'puppeteer';
 import { mkdtemp, rm, writeFile, readFile, mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -251,4 +257,204 @@ describe('writeReportHtml (plan 01-15)', () => {
     const $ = cheerio.load(html);
     expect($('.stat-label:contains("Coverage / Identity")').length).toBe(0);
   });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 01.2-03 — features sections in comp-detail modal
+// ---------------------------------------------------------------------------
+// The 8 native drom sections (Экстерьер, Безопасность, …) are rendered by the
+// runtime renderFeaturesSections function inside the embedded <script> block.
+// We exercise it in headless Chromium and read modal-content.innerHTML to
+// validate the resulting DOM rather than asserting against the static source.
+
+const sampleFeatures = [
+  // Section 1: Экстерьер — three subsections + one null subsection
+  { section: 'Экстерьер и внешнее оснащение', subsection: 'Фары и оптика', label: 'Светодиодные фары', value: true },
+  { section: 'Экстерьер и внешнее оснащение', subsection: 'Фары и оптика', label: 'Дальний свет фар', value: 'опция' },
+  { section: 'Экстерьер и внешнее оснащение', subsection: 'Зеркала', label: 'Электропривод складывания', value: false },
+  { section: 'Экстерьер и внешнее оснащение', subsection: null, label: 'Цвет кузова', value: 'чёрный металлик' },
+  // Section 2: Безопасность — two subsections, includes a numeric value
+  { section: 'Системы активной и пассивной безопасности', subsection: 'Подушки безопасности', label: 'Фронтальные подушки водителя и пассажира', value: true },
+  { section: 'Системы активной и пассивной безопасности', subsection: 'Активная безопасность', label: 'ABS', value: true },
+  { section: 'Системы активной и пассивной безопасности', subsection: 'Активная безопасность', label: 'Количество камер кругового обзора', value: 4 },
+  // Section 3: Прочее — XSS payload in value (T-01.2-08 mitigation)
+  { section: 'Прочее', subsection: null, label: 'Custom', value: '<script>alert(1)</script>' },
+] as const;
+
+// Helper: render the report HTML with a given features[] payload, open the
+// comp-detail modal in headless Chromium, and return the resulting
+// #modal-content innerHTML. Each call launches its own browser instance so the
+// tests are independent.
+async function renderCompModalHtml(features: unknown): Promise<string> {
+  const tmpRoot = await mkdtemp(resolve(tmpdir(), 'phase-01.2-03-viewer-'));
+  const fixedDir = resolve(tmpRoot, 'fixed-snapshot-runid');
+  await mkdir(fixedDir, { recursive: true });
+
+  // Build a synthetic ModelRecord with one Complectation carrying the features.
+  // Casting to ModelRecord lets us pass an undefined `features` to test the
+  // legacy-comp branch (Array.isArray runtime guard).
+  const model = {
+    ...sampleModel,
+    complectations: [
+      {
+        ...sampleModel.complectations[0]!,
+        features: features as never, // intentional: features may be unknown for the legacy-shape test
+      },
+    ],
+  } as unknown as ModelRecord;
+
+  await writeReportHtml(fixedDir, { models: [model], report: sampleReport });
+  const indexHtml = await readFile(resolve(fixedDir, 'index.html'), 'utf-8');
+
+  const browser = await puppeteer.launch({ headless: true });
+  try {
+    const page = await browser.newPage();
+    await page.setContent(indexHtml, { waitUntil: 'load' });
+    // The script-block `models` is a `const` (script-scope, not a window
+    // property) so we read it back from the embedded <script type="application/json">
+    // block and pass it explicitly to openCompModal (which IS on window because
+    // function declarations in classic <script> become globals).
+    //
+    // We reference DOM globals (document/window) through `globalThis` cast to
+    // `any` because the server tsconfig (tsconfig.server.json) does NOT include
+    // the DOM lib — adding it globally would mask real type errors in the
+    // Node-side code. Inside puppeteer's page.evaluate the callback is
+    // serialised + executed in the browser context, so DOM globals exist at
+    // runtime.
+    const modalHtml = await page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const g = globalThis as any;
+      const dataEl = g.document.getElementById('data');
+      if (!dataEl) throw new Error('data block missing');
+      const parsed = JSON.parse(dataEl.textContent || '{}') as {
+        models: Array<{ complectations: unknown[] }>;
+      };
+      const m = parsed.models[0];
+      const c = m && m.complectations ? m.complectations[0] : undefined;
+      g.openCompModal(m, c);
+      const el = g.document.getElementById('modal-content');
+      return el ? el.innerHTML : '';
+    });
+    return modalHtml;
+  } finally {
+    await browser.close();
+    await rm(tmpRoot, { recursive: true, force: true });
+  }
+}
+
+describe('Phase 01.2 — features sections in comp-detail modal', () => {
+  it(
+    'renders distinct section names as <h3> headings (in source order)',
+    async () => {
+      const html = await renderCompModalHtml(sampleFeatures);
+      expect(html).toContain('>Экстерьер и внешнее оснащение<');
+      expect(html).toContain('>Системы активной и пассивной безопасности<');
+      expect(html).toContain('>Прочее<');
+    },
+    30_000,
+  );
+
+  it(
+    'renders distinct subsection names as <h4> headings',
+    async () => {
+      const html = await renderCompModalHtml(sampleFeatures);
+      expect(html).toContain('>Фары и оптика<');
+      expect(html).toContain('>Зеркала<');
+      expect(html).toContain('>Подушки безопасности<');
+      expect(html).toContain('>Активная безопасность<');
+    },
+    30_000,
+  );
+
+  it(
+    'renders boolean true as ✓ and boolean false as ×',
+    async () => {
+      const html = await renderCompModalHtml(sampleFeatures);
+      // ✓ glyph appears for Светодиодные фары + Фронтальные подушки + ABS
+      expect(html).toContain('>✓</span>');
+      // × glyph appears for Электропривод складывания
+      expect(html).toContain('>×</span>');
+    },
+    30_000,
+  );
+
+  it(
+    'renders numbers verbatim',
+    async () => {
+      const html = await renderCompModalHtml(sampleFeatures);
+      // The numeric value 4 should appear as a <dd> for "Количество камер кругового обзора".
+      expect(html).toMatch(/Количество камер кругового обзора<\/dt><dd>4</);
+    },
+    30_000,
+  );
+
+  it(
+    'escapes XSS payloads in feature values (T-01.2-08 mitigation)',
+    async () => {
+      const html = await renderCompModalHtml(sampleFeatures);
+      // The escaped form must appear; the literal payload must NOT appear in
+      // the rendered modal innerHTML (browser would re-serialise as &lt; if it did).
+      expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+      expect(html.indexOf('<script>alert(1)</script>')).toBe(-1);
+    },
+    30_000,
+  );
+
+  it(
+    'preserves drom source order of sections (Экстерьер before Безопасность before Прочее)',
+    async () => {
+      const html = await renderCompModalHtml(sampleFeatures);
+      const idxExt = html.indexOf('>Экстерьер и внешнее оснащение<');
+      const idxSec = html.indexOf('>Системы активной и пассивной безопасности<');
+      const idxOther = html.indexOf('>Прочее<');
+      expect(idxExt).toBeGreaterThan(-1);
+      expect(idxSec).toBeGreaterThan(idxExt);
+      expect(idxOther).toBeGreaterThan(idxSec);
+    },
+    30_000,
+  );
+
+  it(
+    'renders the existing 6 typed sections regardless of features[] presence',
+    async () => {
+      const html = await renderCompModalHtml(sampleFeatures);
+      // Existing typed sections (h3 inside .modal-section)
+      expect(html).toContain('>Идентификация<');
+      expect(html).toContain('>Цена<');
+      expect(html).toContain('>Двигатель и привод<');
+      expect(html).toContain('>Размеры<');
+      expect(html).toContain('>Комфорт<');
+      expect(html).toContain('>Шины<');
+    },
+    30_000,
+  );
+
+  it(
+    'omits the features sections entirely when comp.features is empty',
+    async () => {
+      const html = await renderCompModalHtml([]);
+      // None of the sample-features section names should appear.
+      expect(html.indexOf('>Экстерьер и внешнее оснащение<')).toBe(-1);
+      expect(html.indexOf('>Системы активной и пассивной безопасности<')).toBe(-1);
+      expect(html.indexOf('>Прочее<')).toBe(-1);
+      // Existing 6 typed sections still render (sanity).
+      expect(html).toContain('>Идентификация<');
+      expect(html).toContain('>Шины<');
+    },
+    30_000,
+  );
+
+  it(
+    'omits the features sections entirely when comp.features is undefined (legacy comp)',
+    async () => {
+      // Pass undefined explicitly — exercises the runtime Array.isArray guard.
+      const html = await renderCompModalHtml(undefined);
+      expect(html.indexOf('>Экстерьер и внешнее оснащение<')).toBe(-1);
+      expect(html.indexOf('>Системы активной и пассивной безопасности<')).toBe(-1);
+      // Existing 6 typed sections still render (sanity).
+      expect(html).toContain('>Идентификация<');
+      expect(html).toContain('>Шины<');
+    },
+    30_000,
+  );
 });
