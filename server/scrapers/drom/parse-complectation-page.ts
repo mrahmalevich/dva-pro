@@ -29,6 +29,13 @@ import {
 } from '../shared/types.js';
 import type { TrimRowRef } from './parse-generation-page.js';
 
+// Cheerio v1.2 dropped the `cheerio.Element` namespace export; rather than
+// pull in `domhandler` as a direct dep just for the Element node type, we
+// derive the wrapper type from `CheerioAPI`'s call signature. `$('td')`
+// returns a Cheerio<Element> for any selector so this matches what the
+// walker passes around.
+type CheerioWrapper = ReturnType<cheerio.CheerioAPI>;
+
 export interface ComplectationPageContext {
   brand_slug: string;
   model_slug: string;
@@ -151,6 +158,129 @@ function tireByLabel($: cheerio.CheerioAPI, detailLabel: string, summaryLabel: s
     return text || null;
   }
   return null;
+}
+
+// -- Phase 01.2 Plan 02 — generic section-walker primitives --
+// extractCellValue / walkSections / isFeatureValue are pure helpers used by
+// parseComplectationPage to populate (a) typed slots in drivetrain/dimensions/
+// chassis and (b) the open-ended features bag. Internal — not exported.
+
+/**
+ * Walked-row record produced by walkSections; consumed by applyWalkedRows.
+ */
+interface WalkedRow {
+  section: string;
+  subsection: string | null;
+  label: string;
+  normalisedValue: string | boolean | number | null;
+}
+
+/**
+ * Normalise a value <td> from a comp data row.
+ * Order of checks matters: SVG (yes/no) → boolean; «опция» badge → string;
+ * numeric+optional-unit → number; else trimmed text.
+ *
+ * Returns null only when the cell is empty.
+ *
+ * Threat T-01.2-04 (tampering): callers must pass the VALUE td (`tds[1]`),
+ * never the label td — `find('use[xlink\\:href="#yes"]')` would otherwise
+ * lift a forged SVG out of a manipulated label cell.
+ */
+function extractCellValue(
+  $: cheerio.CheerioAPI,
+  td: CheerioWrapper,
+): string | boolean | number | null {
+  // 1. yes/no SVG (drom uses `<use xlink:href="#yes"|"#no">`)
+  const useEl = td.find('use[xlink\\:href="#yes"], use[xlink\\:href="#no"]').first();
+  if (useEl.length > 0) {
+    const href = useEl.attr('xlink:href') ?? '';
+    if (href === '#yes') return true;
+    if (href === '#no') return false;
+  }
+  // 2. «опция» badge — drom wraps it in nested spans; look for any descendant
+  // whose trimmed text === 'опция'.
+  const optionSpan = td
+    .find('span')
+    .filter((_, el) => $(el).text().trim() === 'опция')
+    .first();
+  if (optionSpan.length > 0) return 'опция';
+  // 3. text — collapse internal whitespace and trim.
+  const raw = td.text().replace(/\s+/g, ' ').trim();
+  if (!raw) return null;
+  // Skip cells that contain only an em-dash placeholder ("—" / "&mdash;") —
+  // drom uses these for "field not applicable to this trim".
+  if (raw === '—' || raw === '—') return null;
+  // 4. numeric? Match leading number with optional decimal (comma or dot).
+  // Bounded character classes — no nested quantifiers (T-01.2-05 mitigation).
+  const numMatch = raw.match(/^(-?\d+(?:[.,]\d+)?)(?:\s|\(|$)/);
+  if (numMatch) {
+    const n = Number(numMatch[1].replace(',', '.'));
+    if (Number.isFinite(n)) return n;
+  }
+  return raw;
+}
+
+/**
+ * Walk every `<tr>` inside the comp specs table; emit one WalkedRow per
+ * data row, scoped by the most recent section + subsection headers.
+ *
+ * Section markers:    `b-text_size_xxl`  (e.g. "Основные параметры")
+ * Subsection markers: `b-text_size_xl`   (e.g. "Размеры кузова")
+ * Data rows:          `b-table__row_cols_2`
+ *
+ * Selector `table.b-table tr` is broad on purpose — drom may add or rename
+ * the wrapping div; section/subsection/data-row markers stay stable.
+ *
+ * Fail-soft: if no sections are found, returns []. If a data row appears
+ * before any section header, it is skipped silently (no NPE on
+ * `currentSection === null`).
+ */
+function walkSections($: cheerio.CheerioAPI): WalkedRow[] {
+  const rows: WalkedRow[] = [];
+  let currentSection: string | null = null;
+  let currentSubsection: string | null = null;
+
+  $('table.b-table tr').each((_, tr) => {
+    const $tr = $(tr);
+    const cls = $tr.attr('class') ?? '';
+    const isSection = /\bb-text_size_xxl\b/.test(cls);
+    const isSubsection = /\bb-text_size_xl\b/.test(cls) && !isSection;
+    const isDataRow = /\bb-table__row_cols_2\b/.test(cls);
+
+    if (isSection) {
+      currentSection = $tr.find('td').first().text().replace(/\s+/g, ' ').trim();
+      currentSubsection = null;
+      return;
+    }
+    if (isSubsection) {
+      currentSubsection = $tr.find('td').first().text().replace(/\s+/g, ' ').trim();
+      return;
+    }
+    if (isDataRow && currentSection) {
+      const tds = $tr.find('> td');
+      if (tds.length < 2) return;
+      const label = $(tds[0]).text().replace(/\s+/g, ' ').trim();
+      if (!label) return;
+      const value = extractCellValue($, $(tds[1]));
+      rows.push({
+        section: currentSection,
+        subsection: currentSubsection,
+        label,
+        normalisedValue: value,
+      });
+    }
+  });
+
+  return rows;
+}
+
+/**
+ * Type guard for valid feature-bag value union.
+ * The features[] schema rejects null entries — callers must filter through
+ * this guard before pushing.
+ */
+function isFeatureValue(v: unknown): v is string | boolean | number {
+  return typeof v === 'string' || typeof v === 'boolean' || typeof v === 'number';
 }
 
 // -- Identity (from trimRow context, NOT from per-comp HTML) --
