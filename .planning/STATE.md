@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-05-03T04:54:21.558Z"
+last_updated: "2026-05-03T07:06:58Z"
 progress:
   total_phases: 9
   completed_phases: 1
@@ -100,6 +100,7 @@ Plan: 9 of 9 (8 plans complete; plan 09 has tasks 1-3 committed, task 4 awaits o
 |----|------|-------------|-------|-------|
 | 260501-koe | 2026-05-01 | DROM_MODEL_WHITELIST + DROM_MIN_PRODUCTION_YEAR env-var filters for drom scraper | 161 → 164 | `server/scrapers/drom/index.ts`, `server/tests/drom-integration.test.ts`, `data/scraped/README.md` |
 | 260503-gja | 2026-05-03 | Live progress (incremental `models.json` + per-loop `[drom]` logs) in drom orchestrator + wipe & restart for BMW X5 only | n/a | `server/scrapers/drom/index.ts`, `data/scraped/drom/*` |
+| 260503-j62 | 2026-05-03 | Drom HTML viewer: clickable comp grid + per-comp detail modal (6 schema groups), fixed engine block ({cc,hp,fuel} schema), reorganized model layout (Обзор card), pricing coverage gate now per-group floors (pricing 0.05; H1 rejected on fixture evidence; H3 win) | 163/163 (puppeteer screenshot golden deferred — see deferred-items.md) | `server/scrapers/shared/report-html.ts`, `server/scrapers/shared/coverage.ts`, `server/tests/__snapshots__/report-html.test.ts.snap` |
 
 ---
 
@@ -147,7 +148,7 @@ Plan: 9 of 9 (8 plans complete; plan 09 has tasks 1-3 committed, task 4 awaits o
 
 ## Session Continuity
 
-**Last session:** 2026-04-29T09:30:59.418Z
+**Last session:** 2026-05-03T07:06:58Z (quick task 260503-j62 completed: drom HTML viewer + pricing coverage)
 
 **Reorder summary:**
 
