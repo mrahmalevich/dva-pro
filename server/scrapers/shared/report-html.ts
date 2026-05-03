@@ -467,6 +467,59 @@ function renderHtml(data: {
     return h;
   }
 
+  // ---- Phase 01.2: render 8 native drom sections from features[] ----
+  //
+  // features is an array of { section, subsection, label, value } entries.
+  // We group preserving first-encountered order (drom's source order).
+  // Booleans render as ✓/× glyphs; strings/numbers render verbatim through esc().
+  // All string values flow through esc() — XSS hardening for untrusted drom labels/values.
+  function renderFeaturesSections(features) {
+    if (!Array.isArray(features) || features.length === 0) return '';
+
+    // Group: section → Map<subsection|'__null__', Array<feature>>, preserving order
+    const sections = new Map();
+    for (const f of features) {
+      if (!f || typeof f.section !== 'string') continue;
+      if (!sections.has(f.section)) sections.set(f.section, new Map());
+      const subKey = f.subsection === null || f.subsection === undefined ? '__null__' : f.subsection;
+      const subs = sections.get(f.section);
+      if (!subs.has(subKey)) subs.set(subKey, []);
+      subs.get(subKey).push(f);
+    }
+
+    let html = '';
+    for (const [sectionName, subsections] of sections) {
+      html += '<div class="modal-section"><h3>' + esc(sectionName) + '</h3>';
+      for (const [subKey, entries] of subsections) {
+        // Subsection sub-heading (skip the synthetic "__null__" key — render a flat list)
+        if (subKey !== '__null__') {
+          html += '<h4 style="color: var(--muted); font-size: 12px; margin: 12px 0 6px; text-transform: none; letter-spacing: 0;">' + esc(subKey) + '</h4>';
+        }
+        html += '<dl class="kv">';
+        for (const entry of entries) {
+          const label = typeof entry.label === 'string' ? entry.label : '';
+          if (!label) continue;
+          let valueHtml;
+          if (entry.value === true) {
+            valueHtml = '<span style="color: var(--ok);">✓</span>';
+          } else if (entry.value === false) {
+            valueHtml = '<span style="color: var(--err);">×</span>';
+          } else if (typeof entry.value === 'number') {
+            valueHtml = esc(String(entry.value));
+          } else if (typeof entry.value === 'string') {
+            valueHtml = esc(entry.value);
+          } else {
+            continue; // unknown type — skip
+          }
+          html += '<dt>' + esc(label) + '</dt><dd>' + valueHtml + '</dd>';
+        }
+        html += '</dl>';
+      }
+      html += '</div>';
+    }
+    return html;
+  }
+
   function openCompModal(model, comp) {
     let html = '<div class="comp-topbar">';
     html += '<button class="comp-back" type="button" aria-label="Назад к модели">← Назад к модели</button>';
@@ -543,6 +596,9 @@ function renderHtml(data: {
       ['Передние', comp.tires.tires_front],
       ['Задние', comp.tires.tires_rear],
     ]);
+
+    // Phase 01.2: 8 native drom sections from features[] (renders after the 6 typed sections)
+    html += renderFeaturesSections(comp.features);
 
     // Extraction errors (warnings)
     if (comp._extraction_errors && comp._extraction_errors.length > 0) {
