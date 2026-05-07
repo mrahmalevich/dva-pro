@@ -83,12 +83,25 @@ export interface Lead {
   status: 'new' | 'in-progress' | 'pdf-sent' | 'closed';
 }
 
+export interface InTransitItem {
+  id: string;
+  brand: string;
+  model: string;
+  country: Country;
+  status: 'in-transit' | 'customs' | 'ready';
+  statusLabel: string;
+  eta: string;
+  priceLandedRu: string;
+  accent: Accent;
+}
+
 export interface CrmState {
   cars: Car[];
   timeline: TimelineStep[];
   faq: FaqItem[];
   reviews: Review[];
   feed: FeedItem[];
+  inTransit: InTransitItem[];
   settings: SiteSettings;
   leads: Lead[];
 }
