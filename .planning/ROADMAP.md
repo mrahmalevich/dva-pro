@@ -12,7 +12,8 @@
 
 ## Phases
 
-- [ ] **Phase 1: Inventory Scrapers — drom.ru → JSON/WebP + Source Stubs** — Crawlee/Cheerio drom.ru/catalog scraper that writes structured JSON files + WebP images on disk; `IScraper` interface stubs for Encar / BeForward / Che168 / Autohome; no DB, no cloud, no queue — single-shot CLI script
+- [x] **Phase 1: Inventory Scrapers — drom.ru → JSON/WebP + Source Stubs** — Crawlee/Cheerio drom.ru/catalog scraper that writes structured JSON files + WebP images on disk; `IScraper` interface stubs for Encar / BeForward / Che168 / Autohome; no DB, no cloud, no queue — single-shot CLI script — Complete 2026-04-29
+- [x] **Phase 2: Redesign from Screenshot** — visual fidelity pass on existing public landing page (10 sections + FloatingDock + QuizModal) closing G-01..G-11 from `02-UI-SPEC.md`. Gated by puppeteer + sharp + pixelmatch golden test at `DIFF_THRESHOLD=0.22`. Final: 19.57% < 22.00%. Complete 2026-05-07.
 - [ ] **Phase 3: Compliance & Infra Foundation** — Yandex Cloud `ru-central1` + Roskomnadzor notification + DNS warm-up — всё, что не ускоряется кодом и должно стартовать первым
 - [ ] **Phase 4: Schema, API Skeleton & Country Registry** — Drizzle schema всех таблиц, Hono `api` + `worker` процессы, public read API, единый реестр 6 стран; importer для Phase 1 JSON → `cars`/`models`
 - [ ] **Phase 5: Frontend Integration, Consent & Legal** — `CrmProvider` поверх real API + react-query, 152-ФЗ чек-бокс, `/legal/*` страницы, ИНН/ОГРН в footer
@@ -125,17 +126,18 @@ Plans:
 
 ### Phase 2: redesign from screenshot
 
+**Status:** Complete 2026-05-07 — see `.planning/phases/02-redesign-from-screenshot/02-VERIFICATION.md`. Final golden-test diff ratio **19.57%** < **22.00%** threshold; all 11 gaps G-01..G-11 closed (3 code, 5 verify-only, 5 golden-covered); 1 item routed to Phase 8 via 02-DEFERRED-POLISH.md.
 **Goal:** Visual fidelity pass on the existing public landing page (10 sections + FloatingDock + QuizModal) to close the 11 enumerated gaps from `02-UI-SPEC.md` against `design-reference.png`. Gated by a puppeteer + sharp.resize + pixelmatch screenshot golden test (`server/tests/landing-page-golden.test.ts`) at `DIFF_THRESHOLD = 0.22` (empirical as-shipped baseline 18.74% per `02-RESEARCH.md` §3 + 3.26pp safety band). No new component library, no shadcn, no CSS-in-JS, no Tailwind, no new font sizes/weights — bespoke `global.css` token system extended only.
 **Requirements**: none — Phase 2 has no REQ-* IDs (verified `02-CONTEXT.md` `<canonical_refs>` + REQUIREMENTS.md traceability table). Coverage is the 11 gap IDs G-01..G-11 from `02-UI-SPEC.md` §Gap Analysis.
 **Depends on:** Phase 1 (catalog/list sections of the new layout consume drom inventory data)
-**Plans:** 5 plans across 4 waves
+**Plans:** 5 plans across 4 waves (all complete)
 
 Plans:
 - [x] 02-01-PLAN.md — Wave 0: landing-page-golden.test.ts (puppeteer + sharp + pixelmatch gate at DIFF_THRESHOLD=0.22)
 - [x] 02-02-PLAN.md — Wave 1: Hero G-01 static coral-glow blob (verbatim from LeadMagnet pattern)
 - [x] 02-03-PLAN.md — Wave 1: global.css G-11 mobile-padding fix + G-08/G-09/G-03/G-06 verify-only
 - [x] 02-04-PLAN.md — Wave 2: QuizModal D-03 light visual-token alignment (no copy/logic/structure changes)
-- [ ] 02-05-PLAN.md — Wave 3: phase-close verification + 02-VERIFICATION.md + STATE/ROADMAP update
+- [x] 02-05-PLAN.md — Wave 3: phase-close verification + 02-VERIFICATION.md + STATE/ROADMAP update
 
 ---
 
@@ -277,14 +279,16 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Inventory Scrapers (drom + stubs, JSON/WebP) | 16/16 | Complete | 2026-04-29 |
-| 01.1. extend-drom-scrape-fields | 10/10 | Complete   | 2026-04-30 |
-| 2. Compliance & Infra Foundation | 0/0 | Not started | — |
-| 3. Schema, API Skeleton & Country Registry | 0/0 | Not started | — |
-| 4. Frontend Integration, Consent & Legal | 0/0 | Not started | — |
-| 5. Lead Flow End-to-End (Quiz → PDF → Email) | 0/0 | Not started | — |
-| 6. Admin Auth, RBAC & Real Admin Panel | 0/0 | Not started | — |
-| 7. Public Site Polish, Multi-Market UI & Analytics | 0/0 | Not started | — |
-| 8. Pre-Launch Checklist & Soft-Launch | 0/0 | Not started | — |
+| 01.1. extend-drom-scrape-fields | 10/10 | Complete | 2026-04-30 |
+| 01.2. extend-complectation-fields | 6/6 | Complete | 2026-05-03 |
+| 2. Redesign from Screenshot | 5/5 | Complete | 2026-05-07 |
+| 3. Compliance & Infra Foundation | 0/0 | Not started | — |
+| 4. Schema, API Skeleton & Country Registry | 0/0 | Not started | — |
+| 5. Frontend Integration, Consent & Legal | 0/0 | Not started | — |
+| 6. Lead Flow End-to-End (Quiz → PDF → Email) | 0/0 | Not started | — |
+| 7. Admin Auth, RBAC & Real Admin Panel | 0/0 | Not started | — |
+| 8. Public Site Polish, Multi-Market UI & Analytics | 0/0 | Not started | — |
+| 9. Pre-Launch Checklist & Soft-Launch | 0/0 | Not started | — |
 
 ---
 
