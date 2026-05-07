@@ -1,6 +1,6 @@
 // server/tests/landing-page-golden.test.ts
-// Phase 02 D-02 / D-02a: structural-drift guard for the public landing page.
-// Threshold tuned to 0.22 against as-shipped baseline of 18.74% (see 02-RESEARCH.md §3).
+// Phase 02.1 D-03 / D-03a: structural-drift guard, re-tuned post-densification.
+// Threshold tuned to 0.28 against post-Wave-1 baseline of 24.52% (see 02.1-RESEARCH.md §6 + 02.1-VERIFICATION.md).
 // Test self-orchestrates Vite dev server bring-up; no external orchestration required.
 
 import { describe, it, expect } from 'vitest';
@@ -17,7 +17,7 @@ const DIFF_PATH = resolve('server/tests/__snapshots__/landing-page-golden.diff.p
 const VIEWPORT = { width: 1280, height: 4000 };
 const REF_W = 605;
 const REF_H = 1280;
-const DIFF_THRESHOLD = 0.22; // 22% — empirical as-shipped floor 18.74% + 3.26pp safety band; see 02-RESEARCH.md §3
+const DIFF_THRESHOLD = 0.28; // 28% — empirical post-Wave-1 floor 24.52% + 3pp safety band; see 02.1-RESEARCH.md §6
 const DEV_URL = 'http://127.0.0.1:5174/';
 
 async function bringUpDevServer(): Promise<ChildProcess> {
