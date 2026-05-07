@@ -5,7 +5,7 @@ import { Icon, Logo } from './atoms';
 const LINKS: [string, string][] = [
   ['Каталог', '#catalog'],
   ['Процесс', '#process'],
-  ['Ребята', '#founders'],
+  ['В пути', '#in-transit'],
   ['Отзывы', '#reviews'],
   ['FAQ', '#faq'],
 ];

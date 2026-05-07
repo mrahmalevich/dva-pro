@@ -35,7 +35,7 @@ export const Footer = () => {
             {[
               ['Каталог', '#catalog'],
               ['Процесс', '#process'],
-              ['Ребята', '#founders'],
+              ['В пути', '#in-transit'],
               ['Отзывы', '#reviews'],
               ['FAQ', '#faq'],
             ].map(([l, h]) => (

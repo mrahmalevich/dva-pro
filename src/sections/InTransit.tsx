@@ -18,11 +18,14 @@ export const InTransit = () => {
           </div>
         </Reveal>
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(${Math.min(state.inTransit.length, 4)}, 1fr)`,
-          gap: 0,
-        }}>
+        <div
+          className="in-transit-grid"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${Math.min(state.inTransit.length, 4)}, 1fr)`,
+            gap: 0,
+          }}
+        >
           {state.inTransit.slice(0, 4).map((it, i) => {
             const count = Math.min(state.inTransit.length, 4);
             const statusIcon: IconName =
@@ -63,6 +66,14 @@ export const InTransit = () => {
           })}
         </div>
       </div>
+
+      {/* Mobile: stack to single column (D-09 mobile guard) */}
+      <style>{`
+        @media (max-width: 720px) {
+          #in-transit .in-transit-grid { grid-template-columns: 1fr !important; }
+          #in-transit .in-transit-grid > div > div { border-right: 1px solid var(--line) !important; }
+        }
+      `}</style>
     </section>
   );
 };
