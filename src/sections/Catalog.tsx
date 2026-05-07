@@ -23,7 +23,7 @@ export const Catalog = ({ onOpenQuiz }: { onOpenQuiz: () => void }) => {
     <section id="catalog" style={{ background: 'var(--ink)', color: '#fff' }}>
       <div className="container">
         <Reveal>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 56, flexWrap: 'wrap', gap: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 32, flexWrap: 'wrap', gap: 24 }}>
             <div>
               <div className="num-marker" style={{ marginBottom: 14 }}>02 / Каталог</div>
               <h2 className="h1">Свежие машины<br /><span className="outline-italic">в&nbsp;пути</span> и&nbsp;в&nbsp;наличии</h2>
@@ -104,7 +104,7 @@ export const Catalog = ({ onOpenQuiz }: { onOpenQuiz: () => void }) => {
         )}
 
         <Reveal>
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 14, marginTop: 64 }}>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 14, marginTop: 32 }}>
             <button className="btn btn-primary btn-lg" onClick={onOpenQuiz}>
               Не нашли своё? Подберём под ваши параметры <Icon name="arrow-right" size={16} />
             </button>
