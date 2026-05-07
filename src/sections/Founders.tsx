@@ -11,7 +11,7 @@ export const Founders = () => {
         <Reveal>
           <div className="num-marker" style={{ marginBottom: 14 }}>04 / Свои ребята</div>
         </Reveal>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 80, alignItems: 'flex-start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 56, alignItems: 'flex-start' }}>
           <Reveal>
             <h2 className="h1">
               {settings.founderRu.name}<span style={{ color: 'var(--coral)' }}>&nbsp;+&nbsp;</span>{settings.founderKr.name}.<br />
@@ -22,7 +22,7 @@ export const Founders = () => {
             </p>
           </Reveal>
           <Reveal delay={120}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 28, marginBottom: 48 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 28, marginBottom: 28 }}>
               <div>
                 <FounderPortrait name={settings.founderKr.name} accent="coral" size={240} />
                 <div style={{ marginTop: 18 }}>
