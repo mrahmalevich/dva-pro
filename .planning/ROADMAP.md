@@ -143,18 +143,19 @@ Plans:
 
 ### Phase 02.1: tighten visual density to design-reference fidelity (INSERTED)
 
+**Status:** Complete 2026-05-07 — see `.planning/phases/02.1-tighten-visual-density-to-design-reference-fidelity/02.1-VERIFICATION.md`. Final fullPage height **7 651 px** in 7000–8000 band; final pixelmatch floor **24.52%** at threshold **0.28** (down from Phase 2's 11 847 px harness baseline; D-03b floor expectation overridden — see VERIFICATION.md tradeoffs). All Phase 2 G-01..G-11 contracts preserved; mobile breakpoint untouched (D-04a verified via `git diff` audit anchored on base SHA `4b104f7`).
 **Goal:** Vertical-density compression pass on the public landing page (10 sections + Hero + Footer) — cut canonical desktop section padding 140 → 72, Hero `min-height: 100vh → 640px` + `paddingTop: 140 → 72` + stats-strip rhythm trim, top-3 within-section trims (Catalog/Process/Founders), and re-tune the puppeteer + sharp + pixelmatch screenshot golden threshold against the post-densification empirical floor. Targets fullPage height 7000–8000 px (acceptable band 6500–8500 per D-01a) — down from Phase 2's ~11 847 px capture-harness baseline. Mobile `@media (max-width: 720px)` blocks are OFF-LIMITS (D-04a). QuizModal D-03 alpha alignment from Phase 2 stays untouched (D-04). All Phase 2 G-01..G-11 contracts preserved.
 **Requirements**: none — Phase 02.1 owns no REQ-* IDs (verified). Coverage mapped via locked decisions D-01..D-04c in `02.1-CONTEXT.md`.
 **Depends on:** Phase 2
-**Plans:** 6 plans across 2 waves
+**Plans:** 6 plans across 2 waves (all complete)
 
 Plans:
-- [ ] 02.1-01-PLAN.md — Wave 1: global.css section padding cut 140 → 72 (D-02)
-- [ ] 02.1-02-PLAN.md — Wave 1: Hero `min-height: 100vh → 640px` + `paddingTop: 140 → 72` + stats-strip rhythm trim (D-02a + D-02b)
-- [ ] 02.1-03-PLAN.md — Wave 1: Catalog within-section trim — heading-row + bottom-CTA gaps (D-02b Offender #1)
-- [ ] 02.1-04-PLAN.md — Wave 1: Process within-section trim — heading-margin + per-step row padding (D-02b Offender #2 — largest within-section saving)
-- [ ] 02.1-05-PLAN.md — Wave 1: Founders within-section trim — outer grid gap + portrait-grid → quote-block gap (D-02b Offender #3)
-- [ ] 02.1-06-PLAN.md — Wave 2: empirical re-tune of `DIFF_THRESHOLD` + post-densification VERIFICATION + ROADMAP/STATE close (D-01a + D-03 + D-03a + D-03b + D-04a)
+- [x] 02.1-01-PLAN.md — Wave 1: global.css section padding cut 140 → 72 (D-02)
+- [x] 02.1-02-PLAN.md — Wave 1: Hero `min-height: 100vh → 640px` + `paddingTop: 140 → 72` + stats-strip rhythm trim (D-02a + D-02b)
+- [x] 02.1-03-PLAN.md — Wave 1: Catalog within-section trim — heading-row + bottom-CTA gaps (D-02b Offender #1)
+- [x] 02.1-04-PLAN.md — Wave 1: Process within-section trim — heading-margin + per-step row padding (D-02b Offender #2 — largest within-section saving)
+- [x] 02.1-05-PLAN.md — Wave 1: Founders within-section trim — outer grid gap + portrait-grid → quote-block gap (D-02b Offender #3)
+- [x] 02.1-06-PLAN.md — Wave 2: empirical re-tune of `DIFF_THRESHOLD` + post-densification VERIFICATION + ROADMAP/STATE close (D-01a + D-03 + D-03a + D-03b + D-04a)
 
 ### Phase 3: Compliance & Infra Foundation
 
@@ -297,6 +298,7 @@ Plans:
 | 01.1. extend-drom-scrape-fields | 10/10 | Complete | 2026-04-30 |
 | 01.2. extend-complectation-fields | 6/6 | Complete | 2026-05-03 |
 | 2. Redesign from Screenshot | 5/5 | Complete | 2026-05-07 |
+| 02.1. tighten visual density | 6/6 | Complete | 2026-05-07 |
 | 3. Compliance & Infra Foundation | 0/0 | Not started | — |
 | 4. Schema, API Skeleton & Country Registry | 0/0 | Not started | — |
 | 5. Frontend Integration, Consent & Legal | 0/0 | Not started | — |
