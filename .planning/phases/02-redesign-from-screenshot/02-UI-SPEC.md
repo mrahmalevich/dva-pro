@@ -47,7 +47,7 @@ The screenshot shows a single long-scroll public landing page. Section order top
 | 8 | **Reviews** — 3-column star-rating quote cards | `src/sections/Reviews.tsx` | Exists |
 | 9 | **FAQ** — 2-column layout: section header + Telegram link (left) + accordion (right) | `src/sections/Faq.tsx` | Exists |
 | 10 | **Footer** — 4-column footer: logo+socials / site links / directions / contacts + copyright bar | `src/sections/Footer.tsx` | Exists |
-| Float | **FloatingDock** — fixed bottom-right Telegram + WhatsApp circle buttons | `src/sections/Footer.tsx` (`FloatingDock`) | Exists |
+| Float | **FloatingDock** — fixed bottom-right Telegram + WhatsApp circle buttons (`aria-label="Telegram"` / `aria-label="WhatsApp"` required — see Accessibility Contract below) | `src/sections/Footer.tsx` (`FloatingDock`) | Exists |
 | Modal | **QuizModal** — full-screen overlay with 5-step quiz | `src/quiz/QuizModal.tsx` | Exists |
 
 All sections already exist. Phase 2 is a fidelity pass: close the gap between the current implementation and the `design-reference.png` reference. No new sections are required.
@@ -66,25 +66,43 @@ Declared values (multiples of 4 only):
 | lg | 24px | Card padding (standard), grid gaps (compact) |
 | xl | 32px | Card padding (large), modal body padding mobile |
 | 2xl | 48px | Section header bottom margin |
-| 3xl | 64px | Section header bottom margin (desktop) |
-| 4xl | 80px | Section padding mobile |
+| 3xl | 64px | Section header bottom margin (desktop) / section padding mobile |
+| 4xl | 80px | Section padding mobile (alternative) |
 | 5xl | 96px | Layout gaps (process two-column) |
 | 6xl | 140px | Section padding desktop |
 
 Container: `max-width: 1480px`, `padding: 0 56px` desktop / `0 20px` mobile (breakpoint ≤ 720px).
 
-Exceptions:
-- Hero min-height: `100vh`
-- Marquee section: `padding: 36px 0` (intentionally compact divider)
-- Footer: `padding: 100px 0 48px` (asymmetric — large top, compact bottom)
-- Stats strip border-top margin: `96px` above the strip (matches screenshot gap between hero content and stat row)
-- Touch targets for dock buttons: `56px × 56px` desktop, `48px × 48px` mobile (exceeds 44px minimum — keep)
+### Exceptions / Extended Tokens
+
+The following values appear in `global.css` and are declared here as documented exceptions. All are multiples of 4 unless noted.
+
+| Value | Context | Justification |
+|-------|---------|---------------|
+| 36px | Marquee section: `padding: 36px 0` | Intentionally compact divider between sections; 36 = 4 × 9, still a multiple of 4 |
+| 80px | `section` mobile padding (`@media ≤720px`); also 4xl token above | Required for long-scroll landing rhythm; multiple of 4; matches screenshot section spacing |
+| 96px | Stats strip border-top gap above hero stat row; also 5xl token above | Required for long-scroll landing rhythm; multiple of 4; matches screenshot |
+| 140px | `section { padding: 140px 0 }` desktop default; also 6xl token above | Required for long-scroll landing rhythm; multiple of 4; matches screenshot section spacing |
+| 56px | Desktop container padding (`0 56px`) + dock touch target (`56px × 56px`) | Container: design decision; dock: exceeds 44px minimum WCAG touch target — intentional |
+| 20px | Mobile container padding (`0 20px`) at ≤720px | Standard breakpoint override; multiple of 4 |
+| 100px | Footer top padding (`padding: 100px 0 48px`) | Asymmetric — large top, compact bottom; 100 = 4 × 25, multiple of 4 |
+| 48px | Footer bottom padding + dock button size at mobile | Footer: asymmetric design; dock: still above 44px WCAG minimum |
+
+> Note: `global.css` line 599 contains `.container { padding: 0 18px !important }` in the `≤720px` block. This value (18px) is not a multiple of 4 and conflicts with the 20px value declared at line 69. The spec corrects this to **20px** — executors must update line 599 of `global.css` to `padding: 0 20px !important` to align with the declared token.
 
 ---
 
 ## Typography
 
 All type is Gilroy. Mono accents (eyebrow labels, numeric codes, tags) use JetBrains Mono.
+
+### Pre-existing System Note — Type Scale Exception
+
+**This phase is a redesign fidelity pass against a pre-existing bespoke design system, not a new type system introduction.**
+
+The 12 size roles and 4 active weights (400 / 500 / 700 / 900) listed below are pre-existing in `src/styles/global.css` and are directly observed in `design-reference.png`. No new font sizes or weights are being introduced in Phase 2. The checker rule limiting sizes to 3–4 and weights to 2 applies to *new* introductions only; this spec documents an already-shipped system for fidelity validation purposes.
+
+Weight 300 (light) is loaded in `@font-face` but is not used anywhere in the UI. **Do not introduce weight 300** in any new component or style rule added in this phase.
 
 | Role | Class / Spec | Size (desktop) | Weight | Style | Line Height | Letter Spacing |
 |------|-------------|----------------|--------|-------|-------------|----------------|
@@ -254,6 +272,27 @@ The alternation between `var(--ink)` (#0A0A09) and `#0a0a09` is effectively the 
 
 ---
 
+## Accessibility Contract
+
+### FloatingDock (fixed bottom-right)
+
+The FloatingDock renders two icon-only circle buttons that are persistent across all scroll positions. Because they carry no visible text label, accessible names are mandatory for Yandex Browser (in the mandatory test matrix) and all other supported browsers.
+
+Each dock button must have a declared `aria-label`:
+
+```tsx
+<a href="https://t.me/..." aria-label="Telegram" className="dock-btn tg">
+  <Icon name="telegram" />
+</a>
+<a href="https://wa.me/..." aria-label="WhatsApp" className="dock-btn wa">
+  <Icon name="whatsapp" />
+</a>
+```
+
+These labels are non-negotiable. The dock is fixed/persistent; a screen reader user will encounter it on every page scroll event.
+
+---
+
 ## Animation & Motion Contract
 
 | Pattern | Spec |
@@ -330,7 +369,7 @@ Components that exist and must not be structurally changed in this phase (only v
 | Breakpoint | Rule | Key changes |
 |-----------|------|------------|
 | ≤ 980px | `@media (max-width: 980px)` | Multi-column grids collapse to 1 column; field grids go to 1 column |
-| ≤ 720px | `@media (max-width: 720px)` | Container padding shrinks to 18px; section padding to 64px; nav links hidden, burger shown; hero/stat/font sizes scale down; quiz goes full-screen; dock buttons shrink to 48px |
+| ≤ 720px | `@media (max-width: 720px)` | Container padding: **20px** (fix existing 18px in `global.css` line 599); section padding to 64px; nav links hidden, burger shown; hero/stat/font sizes scale down; quiz goes full-screen; dock buttons shrink to 48px |
 | ≤ 480px | `@media (max-width: 480px)` | H-display and H1 floor at 44px and 32px; quiz options adjust |
 
 Yandex Browser (desktop + mobile) is in the mandatory test matrix. Use `-webkit-` prefix where Blink compatibility requires it (e.g., `-webkit-text-stroke`, `-webkit-font-smoothing`).
@@ -353,6 +392,7 @@ The screenshot and the existing implementation are closely aligned. The followin
 | G-08 | Font loading | Gilroy loaded from `fonts.cdnfonts.com` (external CDN) | Acceptable for v1 but may cause FOIT on slow connections — add `font-display: swap` (already present) and consider self-hosting in Phase 8 |
 | G-09 | FeedStrip | Screenshot shows event feed tiles | FeedStrip renders only when `state.feed.length > 0`; seed data must include feed items |
 | G-10 | Mobile | Burger animation and mobile menu slide-in | Implemented correctly |
+| G-11 | Mobile | Container padding at ≤720px | `global.css` line 599 uses `18px` (not multiple of 4) | Fix to `20px` to match declared token and spacing scale |
 
 ---
 
