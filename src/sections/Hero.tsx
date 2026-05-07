@@ -47,6 +47,16 @@ export const Hero = ({ onOpenQuiz }: { onOpenQuiz: () => void }) => {
       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(10,10,9,0.55) 0%, rgba(10,10,9,0.4) 40%, rgba(10,10,9,0.92) 100%)' }} />
       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(10,10,9,0.95) 0%, rgba(10,10,9,0.4) 50%, rgba(10,10,9,0.1) 100%)' }} />
 
+      {/* G-01: static radial coral glow blob (matches LeadMagnet treatment per UI-SPEC).
+          Position chosen to match design-reference.png: top-right of hero.
+          Pattern verbatim from LeadMagnet.tsx:6-9; pointerEvents added so it doesn't
+          intercept clicks on the right-column pipeline card. */}
+      <div style={{
+        position: 'absolute', top: -100, right: -150, width: 700, height: 700, borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(213,121,89,0.4), transparent 60%)', filter: 'blur(80px)',
+        pointerEvents: 'none',
+      }} />
+
       <div style={{
         position: 'absolute', left: 0, right: 0, top: '38%',
         textAlign: 'center', pointerEvents: 'none',
