@@ -420,7 +420,7 @@ const SuccessStep = ({ onClose, contact, telegramUrl, whatsappUrl }: {
       <div className="mono" style={{
         display: 'inline-flex', alignItems: 'center', gap: 14,
         padding: '14px 22px',
-        background: 'rgba(255,255,255,0.04)',
+        background: 'rgba(255,255,255,0.03)',
         border: '1px solid var(--line-strong)',
         fontSize: 12, color: 'var(--mute)', letterSpacing: '0.08em', textTransform: 'uppercase',
       }}>
