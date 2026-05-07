@@ -657,17 +657,19 @@ The harness used here (puppeteer + pixelmatch + pngjs + sharp) is already the in
 
 All other claims in this document are tagged inline with `[VERIFIED: ...]` and back to a tool output (file read, command output, or empirical measurement).
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should the test bring up `pnpm dev` or `pnpm preview`?**
    - What we know: `dev` works (measured at 18.74% baseline); `preview` is closer to prod but adds a `pnpm build` step (~30s).
    - What's unclear: whether `preview` baseline is materially different.
    - Recommendation: planner stays with `dev` per A4 unless Wave 0 measures a substantive divergence. Update RESEARCH if `preview` is chosen.
+   - **RESOLVED:** planner uses `pnpm exec vite ... --port 5173` (the dev path) per 02-01-PLAN — Wave 0 startup script in the test's `beforeAll`. The dev/preview divergence is logged as a follow-up: if Wave 0 measures a >1pp shift between the two, the threshold can be re-tuned without revising the plan structure.
 
 2. **Does `.gitignore` already ignore `bmw-pilot-viewer.diff.png`?**
    - What we know: the file path `server/tests/__snapshots__/bmw-pilot-viewer.diff.png` is referenced in `bmw-pilot-viewer.test.ts:33` but I didn't grep `.gitignore`.
    - What's unclear: whether Wave 0 needs to add an entry or the existing `*.diff.png` pattern (or similar) covers it.
    - Recommendation: planner verifies `.gitignore` content during Wave 0; adds `server/tests/__snapshots__/*.diff.png` if not already covered.
+   - **RESOLVED:** `.gitignore:24` already wildcards `server/tests/__snapshots__/*.diff.png`; verified during pattern mapping (see 02-01-PLAN `<interfaces>`). No `.gitignore` edit needed in Wave 0.
 
 ## Environment Availability
 
