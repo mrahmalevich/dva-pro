@@ -125,13 +125,17 @@ Plans:
 
 ### Phase 2: redesign from screenshot
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Visual fidelity pass on the existing public landing page (10 sections + FloatingDock + QuizModal) to close the 11 enumerated gaps from `02-UI-SPEC.md` against `design-reference.png`. Gated by a puppeteer + sharp.resize + pixelmatch screenshot golden test (`server/tests/landing-page-golden.test.ts`) at `DIFF_THRESHOLD = 0.22` (empirical as-shipped baseline 18.74% per `02-RESEARCH.md` §3 + 3.26pp safety band). No new component library, no shadcn, no CSS-in-JS, no Tailwind, no new font sizes/weights — bespoke `global.css` token system extended only.
+**Requirements**: none — Phase 2 has no REQ-* IDs (verified `02-CONTEXT.md` `<canonical_refs>` + REQUIREMENTS.md traceability table). Coverage is the 11 gap IDs G-01..G-11 from `02-UI-SPEC.md` §Gap Analysis.
 **Depends on:** Phase 1 (catalog/list sections of the new layout consume drom inventory data)
-**Plans:** 0 plans
+**Plans:** 5 plans across 4 waves
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 2 to break down)
+- [ ] 02-01-PLAN.md — Wave 0: landing-page-golden.test.ts (puppeteer + sharp + pixelmatch gate at DIFF_THRESHOLD=0.22)
+- [ ] 02-02-PLAN.md — Wave 1: Hero G-01 static coral-glow blob (verbatim from LeadMagnet pattern)
+- [ ] 02-03-PLAN.md — Wave 1: global.css G-11 mobile-padding fix + G-08/G-09/G-03/G-06 verify-only
+- [ ] 02-04-PLAN.md — Wave 2: QuizModal D-03 light visual-token alignment (no copy/logic/structure changes)
+- [ ] 02-05-PLAN.md — Wave 3: phase-close verification + 02-VERIFICATION.md + STATE/ROADMAP update
 
 ---
 
