@@ -132,8 +132,8 @@ Plans:
 
 Plans:
 - [x] 02-01-PLAN.md — Wave 0: landing-page-golden.test.ts (puppeteer + sharp + pixelmatch gate at DIFF_THRESHOLD=0.22)
-- [ ] 02-02-PLAN.md — Wave 1: Hero G-01 static coral-glow blob (verbatim from LeadMagnet pattern)
-- [ ] 02-03-PLAN.md — Wave 1: global.css G-11 mobile-padding fix + G-08/G-09/G-03/G-06 verify-only
+- [x] 02-02-PLAN.md — Wave 1: Hero G-01 static coral-glow blob (verbatim from LeadMagnet pattern)
+- [x] 02-03-PLAN.md — Wave 1: global.css G-11 mobile-padding fix + G-08/G-09/G-03/G-06 verify-only
 - [ ] 02-04-PLAN.md — Wave 2: QuizModal D-03 light visual-token alignment (no copy/logic/structure changes)
 - [ ] 02-05-PLAN.md — Wave 3: phase-close verification + 02-VERIFICATION.md + STATE/ROADMAP update
 
