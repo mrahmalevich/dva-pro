@@ -19,7 +19,7 @@ provides:
 affects:
   - "Plan 01-07 (drom orchestrator): consumes fetchFx({firstRun}) as the very first step of every drom run; FxRates flows into report.json (fx_stale: source==='cbr-cache') per D-17"
   - "Plan 01-03 (sister wave-3 plan, parallel worktree): this worktree ships a minimal placeholder server/scrapers/shared/http.ts; orchestrator must accept plan 03's superset version at wave merge"
-  - "Phase 3 importer: FxRates persistence (or downstream RUB conversion) is out of scope for v1; phase 1 only writes the CBR cache file"
+  - "Phase 4 importer: FxRates persistence (or downstream RUB conversion) is out of scope for v1; phase 1 only writes the CBR cache file"
 
 # Tech tracking
 tech-stack:

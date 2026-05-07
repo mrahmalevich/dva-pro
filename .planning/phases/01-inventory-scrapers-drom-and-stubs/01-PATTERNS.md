@@ -352,7 +352,7 @@ export interface Lead {
 **What new file adds beyond the analog (per RESEARCH.md lines 312-368, fixture-verified):**
 1. **zod runtime validation** (analog `src/crm/types.ts` is type-only — types.ts here doubles as runtime guard).
 2. **Discriminated union with `status` literal as the discriminant** (analog uses literal unions on a single field, not full discriminated unions).
-3. **D-10 `ModelRecord` schema must be kept 1:1 with `ARCHITECTURE.md:555` `models` table sketch** — this is the Phase 3 importer contract.
+3. **D-10 `ModelRecord` schema must be kept 1:1 with `ARCHITECTURE.md:555` `models` table sketch** — this is the Phase 4 importer contract.
 
 **Embed verbatim from RESEARCH.md lines 312-368:**
 ```typescript
@@ -390,7 +390,7 @@ export type ReportSummary = {
   duration_ms: number;
   pages_visited: number;
   models_added: number;
-  models_updated: number;   // for Phase 1: always 0; placeholder for Phase 3 importer parity
+  models_updated: number;   // for Phase 1: always 0; placeholder for Phase 4 importer parity
   images_downloaded: number;
   images_skipped: number;
   errors: { url: string; message: string }[];
@@ -1065,20 +1065,20 @@ export function parseGenerationPage(
 - Document BOTH `models.json` (drom; real in Phase 1) AND `cars.json` (specific listings; stub-only in Phase 1, real in v1.x for Encar/BeForward/Che168/Autohome).
 - Field-by-field table for `ModelRecord` mirroring the zod schema in `shared/types.ts` (single source of truth — Pitfall 6).
 - Worked example: one `ModelRecord` for BMW X5 G05.
-- Phase 3 importer contract: `(brand_slug, model_slug, generation)` is the unique key for upsert.
+- Phase 4 importer contract: `(brand_slug, model_slug, generation)` is the unique key for upsert.
 
 #### `data/scraped/README.md` (NEW/COMMIT)
 
 **Contents (per CONTEXT.md `<code_context>` line 141 + RESEARCH.md line 156, 792, Pitfall 7):**
 - How to run: `pnpm scrape:drom`, exit codes (0/1/2/3), where output lands.
-- Phase 3 consume contract: ALWAYS re-resolve `current/` symlink per invocation; never cache the realpath.
+- Phase 4 consume contract: ALWAYS re-resolve `current/` symlink per invocation; never cache the realpath.
 - Manual prune: `find data/scraped/drom -maxdepth 1 -name "20*Z" -mtime +30 -exec rm -rf {} +` (Open Question 3).
 - OS support: macOS dev + Linux CI; Windows not supported in v1 (symlinks).
 - No secrets required (RESEARCH.md line 871).
 
 #### `data/scraped/drom/brand-aliases.json` (NEW/COMMIT, seed)
 
-**Initial content:** Empty object `{}` (file gets populated on first drom run; committed empty as a placeholder seed so the path exists for Phase 6 admin reference).
+**Initial content:** Empty object `{}` (file gets populated on first drom run; committed empty as a placeholder seed so the path exists for Phase 7 admin reference).
 
 ---
 

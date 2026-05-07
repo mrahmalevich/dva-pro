@@ -48,7 +48,7 @@ progress:
 
 Phase: 01.2 (extend-complectation-fields-capture-all-8-drom-comp-tables-v) — ✅ COMPLETE
 Plans: 6 of 6 complete (5 implemented + 1 deferred-with-rationale)
-**Status:** Phase 01.2 closed; awaiting next-phase decision (Phase 2 Compliance & Infra is the natural next step)
+**Status:** Phase 01.2 closed; awaiting next-phase decision (Phase 3 Compliance & Infra is the natural next step)
 
 **Wave summary:**
 
@@ -68,8 +68,8 @@ Plans: 6 of 6 complete (5 implemented + 1 deferred-with-rationale)
 
 **Parallel work that can start immediately:**
 
-- **Phase 2** — Compliance & Infra. Roskomnadzor 5-day window + Unisender Go 14-day warm-up are calendar-bound. Run `/gsd-discuss-phase 2`.
-- **Founder content collection** (биографии, фото, отзывы) — pure-content track, blocks Phase 7 launch credibility.
+- **Phase 3** — Compliance & Infra. Roskomnadzor 5-day window + Unisender Go 14-day warm-up are calendar-bound. Run `/gsd-discuss-phase 3`.
+- **Founder content collection** (биографии, фото, отзывы) — pure-content track, blocks Phase 8 launch credibility.
 
 ---
 
@@ -81,7 +81,7 @@ Plans: 6 of 6 complete (5 implemented + 1 deferred-with-rationale)
 - Requirements mapped to phases: 73 / 73 (100% coverage)
 - Phases derived: 8 (standard granularity)
 - Research-spike phases flagged: 4 (P1 drom path, P2 infra/compliance, P5 PDF/email, P6 admin auth)
-- Parallelisable tracks identified: 5 (founder content, PDF template, Phase 1 + Phase 2 in week 1, admin polish, DNS warm-up)
+- Parallelisable tracks identified: 5 (founder content, PDF template, Phase 1 + Phase 3 in week 1, admin polish, DNS warm-up)
 
 **Execution:** (will populate as phases close)
 
@@ -107,6 +107,7 @@ Plans: 6 of 6 complete (5 implemented + 1 deferred-with-rationale)
 
 - Phase 01.1 inserted after Phase 01: extend-drom-scrape-fields: full description, complectations, engine/fuel/transmission/dimensions/tires/weight per trim (URGENT)
 - Phase 01.2 inserted after Phase 1: extend-complectation-fields — capture all 8 drom comp tables via hybrid typed-core + features-bag schema, then re-scrape BMW X5 (URGENT)
+- Phase 2 inserted (renumbered from initially-added Phase 9): redesign from screenshot — old Phases 2–8 shifted to 3–9 (text-only renumber across .planning/; only `phases/01*` had real content, no per-phase file renames needed)
 
 ### Decisions Logged (from PROJECT.md + research + reorder)
 
@@ -119,23 +120,23 @@ Plans: 6 of 6 complete (5 implemented + 1 deferred-with-rationale)
 | Email: Unisender Go (RU-resident) | Pre-roadmap (research) | 152-ФЗ alignment + better deliverability to .ru inboxes than foreign SMTP |
 | Frontend stack frozen (no Next.js migration) | Pre-roadmap (research) | Vercel blocked by 152-ФЗ; re-platforming cost 1–1.5 weeks for zero functional gain |
 | 8-phase roadmap (standard granularity) | 2026-04-26 | Derived from research P0–P7 + LAUNCH; matches 4–6 week calendar |
-| **Phase reorder: scraping → Phase 1, scope reduced to drom + stubs, file-based output** | 2026-04-27 | Founder direction: build a running drom scraper FIRST without DB/cloud dependencies; lock IScraper contract via stubs for Encar/BeForward/Che168/Autohome (live impls deferred to v1.x); JSON/WebP output is importable to DB once Phase 3 schema is finalized. Old Phase 5 plans (8) discarded; old Phase 1 (Compliance & Infra) demoted to Phase 2 (no scope change). |
+| **Phase reorder: scraping → Phase 1, scope reduced to drom + stubs, file-based output** | 2026-04-27 | Founder direction: build a running drom scraper FIRST without DB/cloud dependencies; lock IScraper contract via stubs for Encar/BeForward/Che168/Autohome (live impls deferred to v1.x); JSON/WebP output is importable to DB once Phase 4 schema is finalized. Old Phase 6 plans (8) discarded; old Phase 1 (Compliance & Infra) demoted to Phase 3 (no scope change). |
 
 ### Open Questions (surface to founders before respective phase)
 
-- **Phase 1 (was Phase 5):** ✅ Resolved 2026-04-28 via `/gsd-discuss-phase 1` — see `01-CONTEXT.md` decisions D-01..D-17. Remaining open item is the drom partner-API ToS/pricing spike (D-04), which is the researcher's first task during `/gsd-plan-phase 1`.
-- **Phase 2 (was Phase 1):** Какой ИНН/ОГРН какого юрлица оператор ПДн (DVApro ООО? founder ИП?) — affects Roskomnadzor подача и ИНН/ОГРН в footer
-- **Phase 2 (was Phase 1):** Sender-domain `dva.pro` ownership и DNS access — needed для SPF/DKIM/DMARC + warm-up
-- **Phase 2 (was Phase 1):** Yandex Cloud post-2026-05-01 pricing — re-confirm budget
-- **Phase 5 (was Phase 4):** Cyrillic font choice (Inter vs PT Sans vs IBM Plex Sans) + license verification
-- **Phase 7:** Real founder bios + photos + optional video-pitch — content kickoff в Phase 1/2
+- **Phase 1 (was Phase 6):** ✅ Resolved 2026-04-28 via `/gsd-discuss-phase 1` — see `01-CONTEXT.md` decisions D-01..D-17. Remaining open item is the drom partner-API ToS/pricing spike (D-04), which is the researcher's first task during `/gsd-plan-phase 1`.
+- **Phase 3 (was Phase 1):** Какой ИНН/ОГРН какого юрлица оператор ПДн (DVApro ООО? founder ИП?) — affects Roskomnadzor подача и ИНН/ОГРН в footer
+- **Phase 3 (was Phase 1):** Sender-domain `dva.pro` ownership и DNS access — needed для SPF/DKIM/DMARC + warm-up
+- **Phase 3 (was Phase 1):** Yandex Cloud post-2026-05-01 pricing — re-confirm budget
+- **Phase 6 (was Phase 5):** Cyrillic font choice (Inter vs PT Sans vs IBM Plex Sans) + license verification
+- **Phase 8:** Real founder bios + photos + optional video-pitch — content kickoff в Phase 1/2
 
 ### Todos (carry-forward across phases)
 
 - [ ] Founder content writing (биографии, фото, ≥6 отзывов) — start in P1/P2, deliver in P7
 - [ ] Unisender Go domain reputation monitoring — start in P2, ongoing through P8
 - [ ] PDF template design draft — start once P3 schema is committed
-- [ ] **REQUIREMENTS.md traceability update** — D-10 (old Phase 5) reclassified SCRAPE-01..04 as best-effort/v1.x. New Phase 1 makes this binding (stubs only). Run `/gsd-extract-learnings` or manual update at end of new Phase 1 to mark these requirements as v1.x.
+- [ ] **REQUIREMENTS.md traceability update** — D-10 (old Phase 6) reclassified SCRAPE-01..04 as best-effort/v1.x. New Phase 1 makes this binding (stubs only). Run `/gsd-extract-learnings` or manual update at end of new Phase 1 to mark these requirements as v1.x.
 - [ ] **`.planning/phases/01-inventory-scrapers-drom-and-stubs/01-SCOPE.md` cleanup** — after `/gsd-discuss-phase 1` produces the real `01-CONTEXT.md`, decide whether to delete the SCOPE seed or move to `.planning/transitions/`.
 
 ### Blockers
@@ -150,18 +151,18 @@ Plans: 6 of 6 complete (5 implemented + 1 deferred-with-rationale)
 
 **Reorder summary:**
 
-- Old Phase 5 (Inventory Pipeline — Encar + drom + JP/CN scrapers + Crawlee fleet + residential proxies + Yandex Object Storage rehost + pg-boss queue) → New Phase 1 with reduced scope (drom only + IScraper stubs, file-based output, no DB/cloud/queue)
-- Old Phase 1 (Compliance & Infra) → New Phase 2 (unchanged scope)
+- Old Phase 6 (Inventory Pipeline — Encar + drom + JP/CN scrapers + Crawlee fleet + residential proxies + Yandex Object Storage rehost + pg-boss queue) → New Phase 1 with reduced scope (drom only + IScraper stubs, file-based output, no DB/cloud/queue)
+- Old Phase 1 (Compliance & Infra) → New Phase 3 (unchanged scope)
 - Old Phases 2–4 → New Phases 3–5 (`Depends on:` updated to new numbering; otherwise unchanged)
 - Old Phases 6–8 → unchanged numbering
-- Old Phase 5 artifacts (8 plans + CONTEXT + DISCUSSION-LOG + RESEARCH + PATTERNS + VALIDATION) discarded; new Phase 1 directory `.planning/phases/01-inventory-scrapers-drom-and-stubs/` contains only `01-SCOPE.md` (founder-intent seed for the discussion agent)
+- Old Phase 6 artifacts (8 plans + CONTEXT + DISCUSSION-LOG + RESEARCH + PATTERNS + VALIDATION) discarded; new Phase 1 directory `.planning/phases/01-inventory-scrapers-drom-and-stubs/` contains only `01-SCOPE.md` (founder-intent seed for the discussion agent)
 
-**Next session:** Run `/gsd-discuss-phase 1` to gather context for the new Phase 1 (drom scraper + IScraper stubs + JSON/WebP output). Then `/gsd-plan-phase 1` → `/gsd-execute-phase 1`. Phase 2 (Compliance & Infra) can run in parallel.
+**Next session:** Run `/gsd-discuss-phase 1` to gather context for the new Phase 1 (drom scraper + IScraper stubs + JSON/WebP output). Then `/gsd-plan-phase 1` → `/gsd-execute-phase 1`. Phase 3 (Compliance & Infra) can run in parallel.
 
 **Parallel work that can start in same session:**
 
 - Founder content collection (biographies, photos, reviews) — independent of code, blocks P7 launch credibility
-- Phase 2 (Compliance & Infra) discussion + planning — calendar-bound, no shared dependency surface with Phase 1
+- Phase 3 (Compliance & Infra) discussion + planning — calendar-bound, no shared dependency surface with Phase 1
 
 ---
 *State initialized: 2026-04-26 by gsd-roadmapper*

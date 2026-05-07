@@ -1,10 +1,11 @@
 ---
 phase: 2
 slug: redesign-from-screenshot
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-05-07
+reviewed_at: 2026-05-07
 ---
 
 # Phase 2 — UI Design Contract

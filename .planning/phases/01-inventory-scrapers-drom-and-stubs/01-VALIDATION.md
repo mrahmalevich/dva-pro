@@ -57,7 +57,7 @@ created: 2026-04-28
 | 01-17-XX | 14 | 1 | SCRAPE-09 / D-17 | — | `report.json` written even on `blocked` exit; contains all D-17 fields | unit | `pnpm vitest run server/tests/drom-parsers.test.ts -t "report.json"` | ❌ W1 | ⬜ pending |
 | 01-18-XX | 15 | 1 | SCRAPE-05 (E2E) | — | Full pipeline against fixture catalog (1 brand × 2 models) produces deterministic `models.json` + WebP files; idempotent (re-run = same output) | integration | `pnpm vitest run server/tests/drom-integration.test.ts` | ❌ W1 | ⬜ pending |
 | 01-19-XX | 16 | 1 | docs | — | `data/scraped/SCHEMA.md` documents every field of `models.json` per D-10 | manual | `test -f data/scraped/SCHEMA.md && grep -q "brand_slug\|model_slug\|generation\|image_paths" data/scraped/SCHEMA.md` | ❌ W1 | ⬜ pending |
-| 01-20-XX | 16 | 1 | docs | — | `data/scraped/README.md` explains run + Phase 3 import contract | manual | `test -f data/scraped/README.md && grep -q "pnpm scrape\|current/\|Phase 3" data/scraped/README.md` | ❌ W1 | ⬜ pending |
+| 01-20-XX | 16 | 1 | docs | — | `data/scraped/README.md` explains run + Phase 4 import contract | manual | `test -f data/scraped/README.md && grep -q "pnpm scrape\|current/\|Phase 4" data/scraped/README.md` | ❌ W1 | ⬜ pending |
 | 01-21-XX | 17 | 2 | SCRAPE-05 (live) | — | Live `pnpm scrape:drom` smoke (1 brand) populates `data/scraped/drom/<run_id>/models.json` and updates `current/` symlink | manual | `INTEGRATION=1 pnpm scrape:drom --brand=bmw; test $? -eq 0 && test -L data/scraped/drom/current` | ❌ W2 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
@@ -97,7 +97,7 @@ Wave 0 must land **before** any Wave 1 task can begin. It establishes the test f
 | Live drom catalog scrape (full backfill, ~1–2 weeks) | SCRAPE-05 (full coverage) | Network-bound, multi-day, rate-limited; cannot run in CI | Run `pnpm scrape:drom` on a developer machine or single RU VM. Monitor `data/scraped/drom/<run_id>/report.json` for `final_status: 'ok'`. Verify `current/` symlink updates. |
 | Smoke run on 1 brand before full backfill | SCRAPE-05 (smoke gate) | Network-bound | `pnpm scrape:drom --brand=bmw` (or whatever scope flag the planner picks). Verify exit 0 + `models.json` non-empty + `images/*.webp` present + report.json `final_status: 'ok'`. |
 | Vite frontend build still works post pnpm migration | infra | Build step is end-to-end; not a unit test | `pnpm build` — must produce `dist/` with no errors. |
-| `data/scraped/SCHEMA.md` is rich enough for Phase 3 importer | docs | Subjective — Phase 3 author signs off | Phase 3 planner reads SCHEMA.md and confirms every field maps to a Drizzle column without ambiguity. |
+| `data/scraped/SCHEMA.md` is rich enough for Phase 4 importer | docs | Subjective — Phase 4 author signs off | Phase 4 planner reads SCHEMA.md and confirms every field maps to a Drizzle column without ambiguity. |
 | `data/scraped/README.md` runnability test | docs | Documentation test | New developer (or `git clone` on a fresh box) follows README, runs `pnpm scrape:drom`, gets sensible output. |
 
 ---

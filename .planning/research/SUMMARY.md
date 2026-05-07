@@ -87,14 +87,14 @@ no e-commerce checkout · no per-car detail pages · no client self-service port
 
 1. **Foreign-edge PII collection (Cloudflare/Vercel/Sentry/GA in front of forms)** → 1–18M ₽ Roskomnadzor fine, irreversible. *Phase 0/1.*
 2. **Pre-checked or bundled consent checkbox** → 300–700K ₽ per-violation under Sep 2025 amendments; multiplies across the lead DB. *Phase 1/3 (consent UI + server-side reject).*
-3. **Encar / Che168 / Autohome scraped from Russian DC IP** → instant ban + zero data; product breaks on the data side. Need KR/CN residential proxy budget from day one. *Phase 4.*
-4. **USS Auctions scrape attempt behind partner login** → permanent partner ban + JP relationship destroyed. Use BeForward + licensed exporter API; document this constraint in scraper README. *Phase 4 kickoff decision.*
-5. **Cyrillic boxes (`□□□`) in `@react-pdf/renderer`** because a font weight isn't registered → falls back to Helvetica → no Cyrillic for that element. CI fixture test mandatory. *Phase 3.*
-6. **PDFs landing in mail.ru / yandex.ru spam** → conversion artifact never reaches client; team thinks lead is dead. Russian SMTP + DMARC + 2-week warm-up + ≤2MB PDF. *Phase 0 (DNS) + Phase 3.*
-7. **Quiz double-submit race → duplicate leads/PDFs/Bitrix entries.** Idempotency key generated at quiz-*start* (not submit), `INSERT ... ON CONFLICT DO NOTHING RETURNING id`, queue dedupe by lead_id. *Phase 3 + future Bitrix phase.*
-8. **Scraper memory leak (Puppeteer/Playwright) inside API process → OOM, deploys break.** Each scrape = fresh browser, `browser.close()`, separate worker process, systemd `MemoryMax=1G`. *Phase 4 architecture.*
-9. **Stale FX in PDF → mispriced sale → 200–500K ₽ loss per deal or distrust.** Store source-currency price authoritatively, compute RUB on-the-fly from CBR daily XML, show rate date + range + disclaimer in PDF. *Phase 3 + Phase 4.*
-10. **Stub landed-cost shown without disclaimer → quote dispute / breach claim under «Закон о рекламе».** Disclaimer on every PDF page with a price; show range not point; sales script reinforces "финальная — в договоре". *Phase 3.*
+3. **Encar / Che168 / Autohome scraped from Russian DC IP** → instant ban + zero data; product breaks on the data side. Need KR/CN residential proxy budget from day one. *Phase 5.*
+4. **USS Auctions scrape attempt behind partner login** → permanent partner ban + JP relationship destroyed. Use BeForward + licensed exporter API; document this constraint in scraper README. *Phase 5 kickoff decision.*
+5. **Cyrillic boxes (`□□□`) in `@react-pdf/renderer`** because a font weight isn't registered → falls back to Helvetica → no Cyrillic for that element. CI fixture test mandatory. *Phase 4.*
+6. **PDFs landing in mail.ru / yandex.ru spam** → conversion artifact never reaches client; team thinks lead is dead. Russian SMTP + DMARC + 2-week warm-up + ≤2MB PDF. *Phase 0 (DNS) + Phase 4.*
+7. **Quiz double-submit race → duplicate leads/PDFs/Bitrix entries.** Idempotency key generated at quiz-*start* (not submit), `INSERT ... ON CONFLICT DO NOTHING RETURNING id`, queue dedupe by lead_id. *Phase 4 + future Bitrix phase.*
+8. **Scraper memory leak (Puppeteer/Playwright) inside API process → OOM, deploys break.** Each scrape = fresh browser, `browser.close()`, separate worker process, systemd `MemoryMax=1G`. *Phase 5 architecture.*
+9. **Stale FX in PDF → mispriced sale → 200–500K ₽ loss per deal or distrust.** Store source-currency price authoritatively, compute RUB on-the-fly from CBR daily XML, show rate date + range + disclaimer in PDF. *Phase 4 + Phase 5.*
+10. **Stub landed-cost shown without disclaimer → quote dispute / breach claim under «Закон о рекламе».** Disclaimer on every PDF page with a price; show range not point; sales script reinforces "финальная — в договоре". *Phase 4.*
 
 (Honourable mentions in PITFALLS that don't make top 10 but should not be forgotten: shared admin login, scraper ingest "0 cars / never marks sold", country-enum-as-switch, image hot-linking, mock data in prod, browse-tier leads polluting Bitrix, Cyrillic vs Latin model-name canonicalisation, Postgres collation defaults.)
 
@@ -167,37 +167,37 @@ STACK locks Better-Auth (Lucia deprecated). ARCHITECTURE sketches a custom `user
 **Uses:** Hono, Drizzle, Better-Auth schema (tables only, flow in P5), Zod for validation.
 **Avoids pitfalls:** 13 (country enum), 20 (Cyrillic/Latin canonicalisation in models table design).
 
-### Phase 2 — Frontend ↔ API + Consent UI + Legal Pages
+### Phase 3 — Frontend ↔ API + Consent UI + Legal Pages
 **Rationale:** `CrmProvider` rewrite is the integration point for everything downstream; consent UI must ship with the first form interaction to avoid Pitfall 2.
 **Delivers:** `src/api/` typed fetch client + react-query; `CrmProvider` rewritten preserving `useCrm()` surface (admin pages don't change); `/legal/personal-data-policy`, `/legal/offer` pages; 152-FZ consent checkbox on quiz + callback (default unchecked, server-side reject without flag, consent event logged with timestamp+IP+text-version); footer with ИНН/ОГРН.
 **Avoids pitfalls:** 2 (consent), 11 (mock data — seed.ts moves to dev-only fallback).
 
-### Phase 3 — Lead Flow End-to-End (the money phase)
+### Phase 4 — Lead Flow End-to-End (the money phase)
 **Rationale:** This is the product. Until quiz → PDF → email closes for one test user, nothing else matters.
 **Delivers:** `POST /api/public/leads` with idempotency key from quiz-start; lead persistence with `consent_at` + `ip_address`; pg-boss queue with `pdf.generate` + `email.send` job classes; `@react-pdf/renderer` template with all weights/styles registered, self-hosted TTF (Inter or PT Sans + JetBrains Mono accent), CI Cyrillic fixture test; Yandex Object Storage upload + signed URL; Unisender Go send with attachment + sales-channel BCC; landed-cost stub with disclaimer on every PDF page; lead state machine (`new` → `pdf-sent`); quiz "5 minutes" UX message aligned with async flow.
 **Uses:** `@react-pdf/renderer`, Unisender Go, S3 SDK pointed at Yandex endpoint, BullMQ-or-pg-boss.
 **Avoids pitfalls:** 5 (Cyrillic boxes), 6 (spam — needs Phase 0 DNS done), 7 (idempotency), 17 (stub disclaimer).
 **Research-spike needed:** Cyrillic font choice + license verification; Unisender Go inbox-placement test results.
 
-### Phase 4 — One Working Scraper + Master Models
+### Phase 5 — One Working Scraper + Master Models
 **Rationale:** Encar + drom.ru/catalog cover both scraper categories (inventory + master models). The plumbing built here (`shared/normalize`, `shared/images`, `shared/http`, proxy config, soft-delete via `last_seen_at`) is reused for sources 2–5.
 **Delivers:** Encar scraper via Crawlee + KR residential proxy; image rehosting to YOS; UPSERT pattern with `(source, source_id)` UNIQUE; soft-delete via `last_seen_at`; per-source `last_success_at` metric in admin; CBR daily FX rate fetch + RUB-est computed on read (not at scrape time); drom.ru/catalog scraper populating `models` table weekly; brand/model canonicalisation table (Cyrillic ↔ Latin); BeForward scraper as second source (publicly listed, milder anti-bot).
 **Uses:** Crawlee, Playwright (Firefox engine where Chromium is detected), KR proxy provider, Yandex Object Storage.
 **Avoids pitfalls:** 3 (anti-bot per source), 4 (USS — explicitly excluded, BeForward fills JP slot), 8 (upsert + soft-delete), 9 (FX), 10 (image rehosting), 14 (separate worker process, fresh browser per run, `MemoryMax=1G`), 16 (per-source cron windows + migration locks), 20 (model name canonicalisation).
 **Research-spike needed:** KR + CN residential proxy provider selection + budget; Encar fingerprint detection severity (may force Carapis API fallback within 3 days).
 
-### Phase 5 — Admin Auth + Real LeadsAdmin
+### Phase 6 — Admin Auth + Real LeadsAdmin
 **Rationale:** Leads contain PII; admin can't ship without login. Audit log must be in place from first admin write to satisfy 152-FZ + Pitfall 15.
 **Delivers:** Better-Auth with founder + sales-rep roles; sessions in Postgres (instant revocation); `audit_log` table writes on every admin mutation; LeadsAdmin wired to real DB; CarsAdmin can pin `is_admin_curated`; magic-link tested on @yandex.ru / @mail.ru / @rambler.ru / @gmail.com mailboxes; password backup login for both roles.
 **Uses:** Better-Auth, Argon2id, cookie sessions (HttpOnly, SameSite=Lax).
 **Avoids pitfalls:** 15 (shared login), 19 (magic-link to spam).
 
-### Phase 6 — Content Polish + Mobile + Yandex Browser + Widget + Metrika
-**Rationale:** Pure content + UX work that runs against the working backend. Most of this is parallelisable from Phase 2 onward but converges here for QA.
+### Phase 7 — Content Polish + Mobile + Yandex Browser + Widget + Metrika
+**Rationale:** Pure content + UX work that runs against the working backend. Most of this is parallelisable from Phase 3 onward but converges here for QA.
 **Delivers:** Real founder bios + photos; 6+ real reviews (or section hidden); 12–24 realistic seed cars (or hidden until scraper produces enough); finalised FAQ (10–12 items, including US/AE/EU "coming soon", оплата, безопасность ПД); floating Telegram + WhatsApp + Callback widget; Yandex Metrika + 4 goals (open_quiz, complete_q5, submit_lead, pdf_downloaded); mobile audit across all sections; Yandex Browser desktop + mobile smoke-test; per-market hero copy; typed `badges` enum for cars; `liveCount`/`feed` daily edit rhythm + audit log + server-side validation.
 **Avoids pitfalls:** 11 (mock data), 18 (Yandex Browser), 12 (browse-tier handling tagged for Bitrix phase).
 
-### Phase 7 — Pre-Launch Checklist + Soft-Launch
+### Phase 8 — Pre-Launch Checklist + Soft-Launch
 **Rationale:** Verification gate. PITFALLS provides the explicit checklist.
 **Delivers:** Run the "Looks Done But Isn't" checklist (21 items); founder + 1 external user end-to-end test; first 24h of real traffic monitored; founders trained on admin live-feed rhythm.
 
@@ -222,15 +222,15 @@ STACK locks Better-Auth (Lucia deprecated). ARCHITECTURE sketches a custom `user
 
 **Phases needing `/gsd-research-phase` upfront during planning:**
 - **Phase 0** — Yandex Cloud post-May-2026 pricing tier confirmation; Roskomnadzor notification step-by-step (which ИНН of which legal entity is the operator?).
-- **Phase 3** — Cyrillic font selection (Inter vs PT Sans vs IBM Plex Sans for brand fit) + license check; Unisender Go transactional template format + warm-up calendar; idempotency-key UX in quiz (where exactly is it generated and stored).
-- **Phase 4** — Per-source proxy provider selection + monthly budget (KR + CN residential pools); Encar fingerprint detection level (does naive Crawlee work, or is Carapis API needed); BeForward HTML parser shape; drom.ru/catalog robots/Crawl-delay + whether `baza.drom.ru/help/API` covers the catalog data needed (legal route preferred).
-- **Phase 5** — Better-Auth Hono integration specifics; magic-link template inbox-placement test plan.
+- **Phase 4** — Cyrillic font selection (Inter vs PT Sans vs IBM Plex Sans for brand fit) + license check; Unisender Go transactional template format + warm-up calendar; idempotency-key UX in quiz (where exactly is it generated and stored).
+- **Phase 5** — Per-source proxy provider selection + monthly budget (KR + CN residential pools); Encar fingerprint detection level (does naive Crawlee work, or is Carapis API needed); BeForward HTML parser shape; drom.ru/catalog robots/Crawl-delay + whether `baza.drom.ru/help/API` covers the catalog data needed (legal route preferred).
+- **Phase 6** — Better-Auth Hono integration specifics; magic-link template inbox-placement test plan.
 
 **Phases with standard patterns (no research-phase needed):**
 - **Phase 1** — Drizzle schema is mechanical from the table sketches in ARCHITECTURE.
-- **Phase 2** — `CrmProvider` rewrite is a known pattern; consent UI is standard form work; legal pages are content.
-- **Phase 6** — Mobile audit, Metrika setup, content authoring are well-documented standard tasks.
-- **Phase 7** — Checklist execution.
+- **Phase 3** — `CrmProvider` rewrite is a known pattern; consent UI is standard form work; legal pages are content.
+- **Phase 7** — Mobile audit, Metrika setup, content authoring are well-documented standard tasks.
+- **Phase 8** — Checklist execution.
 
 ---
 
@@ -243,7 +243,7 @@ STACK locks Better-Auth (Lucia deprecated). ARCHITECTURE sketches a custom `user
 | Architecture | HIGH on shape (modular monolith, pg-boss, source-attributed cars), MEDIUM on deployment topology (depends on hosting choice, now resolved to Yandex), MEDIUM on schema details (will iterate during phase implementation). |
 | Pitfalls | MEDIUM-HIGH | 152-FZ regulatory specifics: HIGH (official sources, recent legal commentary, dated by Sep 2025 amendments). Scraper specifics: MEDIUM (target sites don't publish anti-bot details; based on second-hand reports). Bitrix24 quirks: HIGH (official docs). Email deliverability: HIGH (Yandex Postmaster, mxtoolbox tooling). |
 
-**Overall:** MEDIUM-HIGH. Stack and architecture are solid enough to start building; per-source scraper economics and proxy budget are the largest known unknowns and will surface real cost in Phase 4. Cyrillic PDF and email deliverability have well-documented prevention recipes that must be followed *exactly* — they are HIGH-confidence-but-fragile.
+**Overall:** MEDIUM-HIGH. Stack and architecture are solid enough to start building; per-source scraper economics and proxy budget are the largest known unknowns and will surface real cost in Phase 5. Cyrillic PDF and email deliverability have well-documented prevention recipes that must be followed *exactly* — they are HIGH-confidence-but-fragile.
 
 ### Gaps to address during planning
 

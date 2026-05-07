@@ -38,7 +38,7 @@ key-decisions:
   - "fetchHtml decodes via iconv-lite using charset from response Content-Type header — closes Pitfall 2 false negative"
   - "Captcha regex set rewritten: specific multi-word challenge phrases + widget identifiers (captcha, recaptcha/hcaptcha/cf-challenge/cf-turnstile, капча, я не робот, подтвердите ... не робот, введите ... символ). Drops bare /проверка/i, /robot/i, /verify/i which false-positived on legitimate nav."
   - "Bad smoke-#1 run dir (mojibake'd records, 2026-04-28T12-59-06Z) deleted before re-run; 2nd run dir (2026-04-28T14-27-23Z, blocked) deleted before 3rd run"
-  - "Task 2 (full backfill) deferred per plan — operator decision when ready for 1–2 week unattended run; Phase 2/3 do not block on it (RESEARCH Risk 7 mitigation)"
+  - "Task 2 (full backfill) deferred per plan — operator decision when ready for 1–2 week unattended run; Phase 3/3 do not block on it (RESEARCH Risk 7 mitigation)"
 
 patterns-established:
   - "Live smoke gate as data-quality test, not just connectivity test — caught both bugs that fixture tests missed because fixtures were sanitized to UTF-8"

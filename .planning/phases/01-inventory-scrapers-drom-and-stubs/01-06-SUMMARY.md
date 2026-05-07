@@ -17,8 +17,8 @@ provides:
   - server/tests/symlink.test.ts — 4 tests covering atomic-replace visibility, relative target, no tmp leftover
 affects:
   - "Plan 01-07 (drom orchestrator): can now writeCursor() after every brand and pointCurrentAt(runDir) after a successful run; deleteCursor() on clean exit"
-  - "Plan 01-08 (data/scraped/README.md): documents Pitfall 7 — Phase 3 importer must always re-resolve current/ per invocation; never cache realpath()"
-  - "Phase 3 importer: atomic visibility property guarantees a concurrent reader of current/ always lands on a complete run dir, never a half-state"
+  - "Plan 01-08 (data/scraped/README.md): documents Pitfall 7 — Phase 4 importer must always re-resolve current/ per invocation; never cache realpath()"
+  - "Phase 4 importer: atomic visibility property guarantees a concurrent reader of current/ always lands on a complete run dir, never a half-state"
 
 # Tech tracking
 tech-stack:
@@ -145,8 +145,8 @@ One environmental action not in the task list itself: `pnpm install --frozen-loc
 | Threat ID | Status |
 |---|---|
 | T-06-01 (Hand-edited `.cursor.json` causes wrong resume) | **Accepted as documented.** Cursor file is gitignored via plan 01's `.gitignore`. A bad cursor causes re-fetch of wrong models, not data corruption — orchestrator's zod validation per Pitfall 1 catches malformed records. Out of scope for ASVS L1. |
-| T-06-02 (Symlink swapped between rename + Phase 3 read) | **Accepted as documented.** Phase 1 + Phase 3 do not run concurrently in v1 (single dev machine). Phase 3's documented contract is "always re-resolve `current/` per invocation" — Pitfall 7 — captured for plan 08's README. |
-| T-06-03 (Malicious symlink target → Phase 3 reads `/etc/passwd`) | **Mitigated by structure.** `pointCurrentAt` computes the target via `basename(runDir)` — a pure baseName extraction with no `..` traversal possible. Even if `runDir` were attacker-controlled (it isn't — it comes from the orchestrator's run-id minting), the symlink target string is constrained to a single path component. Phase 3's importer is independently expected to validate that `realpath(current)` falls under `data/scraped/` (out of scope for this plan). |
+| T-06-02 (Symlink swapped between rename + Phase 4 read) | **Accepted as documented.** Phase 1 + Phase 4 do not run concurrently in v1 (single dev machine). Phase 4's documented contract is "always re-resolve `current/` per invocation" — Pitfall 7 — captured for plan 08's README. |
+| T-06-03 (Malicious symlink target → Phase 4 reads `/etc/passwd`) | **Mitigated by structure.** `pointCurrentAt` computes the target via `basename(runDir)` — a pure baseName extraction with no `..` traversal possible. Even if `runDir` were attacker-controlled (it isn't — it comes from the orchestrator's run-id minting), the symlink target string is constrained to a single path component. Phase 4's importer is independently expected to validate that `realpath(current)` falls under `data/scraped/` (out of scope for this plan). |
 | T-06-04 (`.cursor.json` accidentally committed) | **Mitigated by structure.** Plan 01's `.gitignore` already excludes `data/scraped/**/.cursor.json`. The orchestrator (plan 07) writes `.cursor.json` into per-run dirs that are themselves gitignored. |
 
 ## Threat Flags
@@ -160,7 +160,7 @@ None. Both `cursor.ts` and `symlink.ts` are fully implemented and exercised by t
 ## Forward-Carrying Notes (for plan 07 + plan 08)
 
 - **Plan 07 (drom orchestrator) wiring:** `writeCursor(runDir, {lastBrandSlug, lastModelSlug, completedAt: new Date().toISOString()})` after every model in a brand boundary; `pointCurrentAt(runDir)` only after a successful run; `deleteCursor(runDir)` immediately after `pointCurrentAt` succeeds. Resume flow: at run start, `await readCursor(runDir)` → if non-null, skip brands ≤ `lastBrandSlug` and within that brand skip models ≤ `lastModelSlug`.
-- **Plan 08 (`data/scraped/README.md`) Pitfall 7 callout:** Phase 3's importer MUST always re-resolve `current/` per invocation (never cache `realpath()` across runs) — the symlink target rotates with each successful scrape, and the importer's correctness depends on always reading the freshest target. The current README.md draft already documents this (lines 60-63); no further action needed in this plan.
+- **Plan 08 (`data/scraped/README.md`) Pitfall 7 callout:** Phase 4's importer MUST always re-resolve `current/` per invocation (never cache `realpath()` across runs) — the symlink target rotates with each successful scrape, and the importer's correctness depends on always reading the freshest target. The current README.md draft already documents this (lines 60-63); no further action needed in this plan.
 - **Pitfall 3 escalation trigger:** if plan 09's smoke run shows a mid-brand crash burning >1 brand's worth of pages on resume, escalate to a Phase 1.x finer-grained cursor (per-model or per-page granularity). The current cursor shape is forward-compatible with adding optional fields like `lastGenerationSlug` without breaking existing `.cursor.json` files (`readCursor` already tolerates extra keys via `as Cursor` cast).
 
 ## Commits
@@ -178,7 +178,7 @@ None. Both `cursor.ts` and `symlink.ts` are fully implemented and exercised by t
 
 - **Plan 01-07 (drom orchestrator):** can now `import { readCursor, writeCursor, deleteCursor } from '../shared/cursor.js'` and `import { pointCurrentAt } from '../shared/symlink.js'` against a stable, type-checked surface with green tests.
 - **Plan 01-08 (data/scraped/README.md):** Pitfall 7 reader contract for `current/` is referenced verbatim in `symlink.ts` JSDoc; README.md task already includes this language.
-- **Phase 3 importer:** the relative-target invariant is a hard constraint; importer must `realpath(current)` and validate it falls under the expected `data/scraped/<source>/` root.
+- **Phase 4 importer:** the relative-target invariant is a hard constraint; importer must `realpath(current)` and validate it falls under the expected `data/scraped/<source>/` root.
 
 ## Self-Check: PASSED
 

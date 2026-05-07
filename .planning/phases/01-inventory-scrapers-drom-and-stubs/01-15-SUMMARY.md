@@ -117,7 +117,7 @@ Each task was committed atomically with `--no-verify` per the worktree contract:
 - **`server/tests/report-html.test.ts`** (NEW, 6 tests) — Covers: (1) basic disk-read + brand string presence; (2) cheerio.load parses without throwing; (3) missing models.json fallback to `[]`; (4) `opts.models`/`opts.report` override on-disk values; (5) data-embedding contract (models embedded verbatim in `<script type="application/json">` block; round-trip via JSON.parse after un-escaping `\\u003c`); (6) byte-stable snapshot golden via `toMatchSnapshot()`.
 - **`server/tests/__snapshots__/report-html.test.ts.snap`** (NEW) — Vitest snapshot file. Auto-generated on first run, asserts byte-stability on subsequent runs.
 - **`data/scraped/README.md`** — Output-tree gains an `index.html` line; new "Report viewer (`index.html`) — auto-emitted per run" subsection between §"Crash recovery" and §"Incremental snapshot" documents the browser-open invocation, the viewer's features, regenerability, and the explicit "every final_status" guarantee.
-- **`data/scraped/SCHEMA.md`** — New top-level §"Report viewer (`index.html`)" between the report.json field table and §"Brand-aliases" notes the file is non-canonical, regeneratable, NOT part of the Phase 3 importer contract, and points at `server/scrapers/shared/report-html.ts` as the single source of truth.
+- **`data/scraped/SCHEMA.md`** — New top-level §"Report viewer (`index.html`)" between the report.json field table and §"Brand-aliases" notes the file is non-canonical, regeneratable, NOT part of the Phase 4 importer contract, and points at `server/scrapers/shared/report-html.ts` as the single source of truth.
 
 ## Confirmations
 

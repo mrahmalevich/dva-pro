@@ -5,7 +5,7 @@
 
 **Date:** 2026-04-28
 **Phase:** 01-inventory-scrapers-drom-and-stubs
-**Areas discussed:** Stack (layout / pkg mgr / toolchain), Drom (access route + first-run scope), Output contract (paths / run-id / re-run / IScraper), JSON schema depth (Phase 3 readiness)
+**Areas discussed:** Stack (layout / pkg mgr / toolchain), Drom (access route + first-run scope), Output contract (paths / run-id / re-run / IScraper), JSON schema depth (Phase 4 readiness)
 
 ---
 
@@ -15,9 +15,9 @@
 
 | Option | Description | Selected |
 |--------|-------------|----------|
-| `server/scrapers/` | Matches CLAUDE.md convention. Phase 3 cleanly adds server/api/, server/db/, etc. alongside. server/scrapers/{drom,encar,beforward,che168,autohome,shared}/. Establishes the boundary now. | ✓ |
-| `scrapers/` at repo root | Flatter; no implication that a server is coming. Easier as standalone CLI. Phase 3 either moves under server/ (churn) or leaves it sibling (slightly weird). | |
-| `src/server/scrapers/` | Single tsconfig, single source root. Muddles client-only Vite SPA paths with Node-only server code; bundler config gets messier in Phase 3. | |
+| `server/scrapers/` | Matches CLAUDE.md convention. Phase 4 cleanly adds server/api/, server/db/, etc. alongside. server/scrapers/{drom,encar,beforward,che168,autohome,shared}/. Establishes the boundary now. | ✓ |
+| `scrapers/` at repo root | Flatter; no implication that a server is coming. Easier as standalone CLI. Phase 4 either moves under server/ (churn) or leaves it sibling (slightly weird). | |
+| `src/server/scrapers/` | Single tsconfig, single source root. Muddles client-only Vite SPA paths with Node-only server code; bundler config gets messier in Phase 4. | |
 
 **User's choice:** `server/scrapers/`
 **Notes:** Recommended option; aligns with CLAUDE.md convention.
@@ -26,7 +26,7 @@
 
 | Option | Description | Selected |
 |--------|-------------|----------|
-| pnpm | CLAUDE.md already names pnpm. Switching now is trivial (3 deps); switching later is a multi-PR migration including CI. pnpm workspaces help when Phase 3 adds packages/shared. | ✓ |
+| pnpm | CLAUDE.md already names pnpm. Switching now is trivial (3 deps); switching later is a multi-PR migration including CI. pnpm workspaces help when Phase 4 adds packages/shared. | ✓ |
 | Stay on npm | Zero migration cost; works fine for current scope. Loses CLAUDE.md alignment. | |
 
 **User's choice:** pnpm
@@ -99,7 +99,7 @@
 
 | Option | Description | Selected |
 |--------|-------------|----------|
-| Append new run dir + symlink current/ → latest | Each run is a fresh dated dir. current/ is atomically updated. Phase 3 reads current/. Prior runs preserved for diffing. | ✓ |
+| Append new run dir + symlink current/ → latest | Each run is a fresh dated dir. current/ is atomically updated. Phase 4 reads current/. Prior runs preserved for diffing. | ✓ |
 | Append-only (no current/ symlink) | Just dated dirs; consumer finds latest via lex sort. Simpler but couples consumer to layout. | |
 | Overwrite canonical current/, keep last N as snapshots | current/ overwritten in place; snapshots in history/<run_id>/. Risk: in-progress run can corrupt current/. | |
 
@@ -119,7 +119,7 @@
 
 ---
 
-## JSON schema depth (Phase 3 readiness)
+## JSON schema depth (Phase 4 readiness)
 
 > Mid-discussion correction: drom outputs MASTER MODELS, not specific listings. The SCOPE seed's `cars.json` naming was wrong. drom → `models.json`; the four stub sources would emit `cars.json` if implemented. Recorded as Specifics §"`models.json` corrects the SCOPE seed's `cars.json` naming."
 
@@ -127,9 +127,9 @@
 
 | Option | Description | Selected |
 |--------|-------------|----------|
-| Full 1:1 with ARCHITECTURE.md models sketch | Every field of the future models table (brand, brand_slug, model, model_slug, generation, year_from, year_to, body_types[], engine_options[{cc,hp,fuel}], drive_options[], description_ru, price_min/max_rub, source_url, scraped_at). Phase 3 importer = pure JSON→SQL. Cost: scraper has to parse generation pages and engine spec tables. | ✓ |
-| Minimal | Just brand/model/year_range/source_url + description_ru. Phase 3 fills the rest via re-fetch or admin. | |
-| Hybrid | Scrape brand/model/generation/year_range/body_types/drive_options/description_ru; defer engine_options + price_range to Phase 3. | |
+| Full 1:1 with ARCHITECTURE.md models sketch | Every field of the future models table (brand, brand_slug, model, model_slug, generation, year_from, year_to, body_types[], engine_options[{cc,hp,fuel}], drive_options[], description_ru, price_min/max_rub, source_url, scraped_at). Phase 4 importer = pure JSON→SQL. Cost: scraper has to parse generation pages and engine spec tables. | ✓ |
+| Minimal | Just brand/model/year_range/source_url + description_ru. Phase 4 fills the rest via re-fetch or admin. | |
+| Hybrid | Scrape brand/model/generation/year_range/body_types/drive_options/description_ru; defer engine_options + price_range to Phase 4. | |
 
 **User's choice:** Full 1:1 with ARCHITECTURE.md models sketch
 **Notes:** Recommended. Captured in D-10 with field-by-field schema.
@@ -140,7 +140,7 @@
 |--------|-------------|----------|
 | 1 hero image per model | One representative image as <brand_slug>-<model_slug>-<generation>-hero.webp. ~Hundreds of MB total. Sufficient for catalog cards and PDF embeds. | ✓ |
 | All gallery images per model | Full gallery 5–10 images per model. ~Several GB total; overkill for master-models. | |
-| No images in Phase 1 | Skip images entirely; rely on Encar/etc. + admin-curated for visuals. Simplest scraper but Phase 4/7 have no real visuals from drom. | |
+| No images in Phase 1 | Skip images entirely; rely on Encar/etc. + admin-curated for visuals. Simplest scraper but Phase 5/7 have no real visuals from drom. | |
 
 **User's choice:** 1 hero image per model
 **Notes:** Recommended. Captured in D-11.
@@ -172,12 +172,12 @@ Operational defaults Claude set without asking (also user-accepted at the wrap-u
 Captured in CONTEXT.md `<deferred>`:
 
 - Live Encar / BeForward / Che168 / Autohome scrapers → v1.x
-- `data/scraped/` → DB import → Phase 3
-- WebP rehost to Yandex Object Storage → Phase 3 importer
-- Per-source admin metrics endpoint → Phase 6
-- Soft-delete via last_seen_at → Phase 3
-- Cron / scheduled invocation → Phase 3+ pg-boss
+- `data/scraped/` → DB import → Phase 4
+- WebP rehost to Yandex Object Storage → Phase 4 importer
+- Per-source admin metrics endpoint → Phase 7
+- Soft-delete via last_seen_at → Phase 4
+- Cron / scheduled invocation → Phase 4+ pg-boss
 - Concurrency upgrades (multi-thread + per-IP proxies) → v1.x
 - Brand whitelist or top-N smoke pass → considered, not chosen
-- CI Cyrillic-fixture test for scraper → Wave 0 if budget allows, else Phase 3
-- Brand-aliases admin override UI → Phase 6
+- CI Cyrillic-fixture test for scraper → Wave 0 if budget allows, else Phase 4
+- Brand-aliases admin override UI → Phase 7

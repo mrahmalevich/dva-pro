@@ -18,7 +18,7 @@ provides:
 affects:
   - "Wave 3+ plans (03..07): every Phase 1 plan now imports from server/scrapers/shared/types.ts and uses atomicWriteFile() — contract is locked"
   - "Plan 01-07 (drom orchestrator): will overwrite server/scrapers/drom/index.ts with the real implementation; cli.ts already imports it correctly"
-  - "Phase 3 importer: ModelRecord zod shape is now binding (matches data/scraped/SCHEMA.md line-by-line)"
+  - "Phase 4 importer: ModelRecord zod shape is now binding (matches data/scraped/SCHEMA.md line-by-line)"
 
 # Tech tracking
 tech-stack:
@@ -206,7 +206,7 @@ These stubs are a **deliberate** Phase 1 outcome (the plan's purpose includes "4
 
 - **Plans 03..06 (wave 3+):** can now `import type { IScraper, ScrapeResult, ModelRecord } from '../shared/types.js'` and `import { atomicWriteFile } from '../shared/atomic-write.js'` against a stable, type-checked surface.
 - **Plan 01-07 (drom orchestrator):** will overwrite `server/scrapers/drom/index.ts` with the real implementation; `cli.ts` already imports `./drom/index.js` correctly. The exit-code contract (D-09) is locked.
-- **Phase 3 importer:** `ModelRecord` zod schema is the binding contract — it matches `data/scraped/SCHEMA.md` (plan 01-08) field-for-field.
+- **Phase 4 importer:** `ModelRecord` zod schema is the binding contract — it matches `data/scraped/SCHEMA.md` (plan 01-08) field-for-field.
 
 ## Self-Check: PASSED
 

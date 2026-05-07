@@ -275,7 +275,7 @@ dva.pro/
 │   │   │   ├── admin/leads.ts
 │   │   │   ├── admin/cms.ts
 │   │   │   ├── admin/inventory.ts
-│   │   │   └── webhooks/bitrix.ts    # phase 2
+│   │   │   └── webhooks/bitrix.ts    # phase 3
 │   │   ├── auth/
 │   │   │   └── better-auth.ts        # Better-Auth config + Hono adapter
 │   │   ├── pdf/
@@ -297,7 +297,7 @@ dva.pro/
 │   │   │   ├── scrape-che168.ts
 │   │   │   ├── scrape-autohome.ts
 │   │   │   ├── scrape-drom-catalog.ts
-│   │   │   └── sync-bitrix.ts        # phase 2
+│   │   │   └── sync-bitrix.ts        # phase 3
 │   │   └── schedules.ts              # cron registrations on boot
 │   ├── scrapers/                     # Crawlee crawler builders, one per source
 │   │   ├── encar/

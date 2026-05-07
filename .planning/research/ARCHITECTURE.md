@@ -777,7 +777,7 @@ DVApro's audience is Russian. Yandex Object Storage's `ru-central1` is the only 
 
 1. **All PII storage in ru-central1** — Postgres + Object Storage.
 2. **Consent capture on lead form** — quiz contact step needs a "согласие на обработку ПДн" checkbox or auto-consent text near the submit button. `leads.consent_at` records when.
-3. **Data subject rights endpoint** (deferred to phase 2 but designed for): `/api/admin/leads/:id/export` and `/api/admin/leads/:id/delete` should be designed-in.
+3. **Data subject rights endpoint** (deferred to phase 3 but designed for): `/api/admin/leads/:id/export` and `/api/admin/leads/:id/delete` should be designed-in.
 4. **No third-party trackers loaded before consent** (Yandex Metrika is fine and Russian-hosted; Google Analytics is not).
 
 ---

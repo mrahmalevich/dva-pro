@@ -59,15 +59,15 @@
 
 ### Deferred Ideas (OUT OF SCOPE)
 - Live Encar/BeForward/Che168/Autohome scrapers (v1.x — stubs only here).
-- `data/scraped/` → DB import (Phase 3 `pnpm import:scraped`).
-- Image rehost to Yandex Object Storage (Phase 3 importer).
+- `data/scraped/` → DB import (Phase 4 `pnpm import:scraped`).
+- Image rehost to Yandex Object Storage (Phase 4 importer).
 - Per-source admin metrics endpoint (replaced with `report.json`).
-- Soft-delete via `last_seen_at` (Phase 3 importer logic).
-- Cron / scheduled invocation (Phase 3+).
+- Soft-delete via `last_seen_at` (Phase 4 importer logic).
+- Cron / scheduled invocation (Phase 4+).
 - Concurrency upgrades / multi-IP scraping (v1.x).
 - Brand whitelist / top-N smoke pass (full backfill confirmed).
-- CI Cyrillic-fixture test (defer to Phase 3 alongside importer's CI; Phase 1 does *local* fixture tests, see Section 15).
-- Brand-aliases conflict resolution UI (Phase 6 admin).
+- CI Cyrillic-fixture test (defer to Phase 4 alongside importer's CI; Phase 1 does *local* fixture tests, see Section 15).
+- Brand-aliases conflict resolution UI (Phase 7 admin).
 </user_constraints>
 
 <phase_requirements>
@@ -109,8 +109,8 @@
 | Resume cursor | Filesystem (`data/scraped/drom/<run_id>/.cursor.json`) | — | Crash-tolerance is on disk only; no DB in Phase 1. |
 | Brand-alias dictionary | Filesystem (`data/scraped/drom/brand-aliases.json`) | — | Side-effect of parse loop; merged idempotently across runs. |
 | Run telemetry | Filesystem (`data/scraped/drom/<run_id>/report.json`) | — | Replaces admin endpoint per phase scope. |
-| `IScraper` contract | TypeScript interface in `server/scrapers/shared/types.ts` | CLI dispatcher in `server/scrapers/cli.ts` | Single contract drom and 4 stubs implement; Phase 3+ workers reuse. |
-| Phase 3 importer hand-off | Filesystem `data/scraped/drom/current/` symlink | `models.json` schema (`SCHEMA.md`) | Phase 3 reads symlinked dir; never embeds knowledge of `<run_id>` path. |
+| `IScraper` contract | TypeScript interface in `server/scrapers/shared/types.ts` | CLI dispatcher in `server/scrapers/cli.ts` | Single contract drom and 4 stubs implement; Phase 4+ workers reuse. |
+| Phase 4 importer hand-off | Filesystem `data/scraped/drom/current/` symlink | `models.json` schema (`SCHEMA.md`) | Phase 4 reads symlinked dir; never embeds knowledge of `<run_id>` path. |
 
 **Sanity-check:** Phase 1 has *no* HTTP server, *no* DB, *no* browser, *no* worker process. All capabilities run inside one Node CLI invocation. The architectural map exists to confirm that nothing in this phase tries to leak into infra layers reserved for later phases.
 
@@ -223,7 +223,7 @@ All versions above were verified live on 2026-04-28 against the npm registry via
                                                   success)      (idempotent
                                                                  merge)
 
-       Phase 3 importer reads:
+       Phase 4 importer reads:
        data/scraped/drom/current/ ──symlink──▶  data/scraped/drom/<latest_run_id>/
 ```
 
@@ -289,7 +289,7 @@ dva.pro/
 └── data/                                          # NEW
     └── scraped/
         ├── SCHEMA.md                              # COMMITTED — record contract
-        ├── README.md                              # COMMITTED — how to run, where output lands, how Phase 3 consumes
+        ├── README.md                              # COMMITTED — how to run, where output lands, how Phase 4 consumes
         ├── drom/
         │   ├── brand-aliases.json                 # COMMITTED (small, useful seed)
         │   ├── current/   ──symlink──▶            # IGNORED via .gitignore
@@ -344,7 +344,7 @@ export type ReportSummary = {
   duration_ms: number;
   pages_visited: number;
   models_added: number;
-  models_updated: number;   // for Phase 1: always 0; placeholder for Phase 3 importer parity
+  models_updated: number;   // for Phase 1: always 0; placeholder for Phase 4 importer parity
   images_downloaded: number;
   images_skipped: number;
   errors: { url: string; message: string }[];
@@ -452,11 +452,11 @@ export async function atomicWriteFile(target: string, content: Buffer | string):
 
 ### Anti-Patterns to Avoid
 
-- **Truncate-and-reload (PITFALLS Pitfall 8a):** Phase 1 runs are append-only — each `<run_id>` is a new directory. Phase 3 importer (separate phase) handles UPSERT semantics; Phase 1 NEVER deletes a previous run.
+- **Truncate-and-reload (PITFALLS Pitfall 8a):** Phase 1 runs are append-only — each `<run_id>` is a new directory. Phase 4 importer (separate phase) handles UPSERT semantics; Phase 1 NEVER deletes a previous run.
 - **Single global mutable buffer for `models.json`:** stream rows to a tmp file as they're parsed; rename to `models.json` only at end. (Or write a JSON array opening `[`, append objects with comma, close `]` — but a final `JSON.stringify(allRecords, null, 2)` write at end is simpler given expected total <50K rows.) **Decision: collect in memory, single atomic write at end** — total bytes ~50K rows × ~1 KB = ~50 MB, acceptable for one-time backfill on a dev machine.
 - **`fetch()` with no timeout:** drom returns 5xx occasionally; without `timeout: { request: 30000 }` the run hangs.
 - **Concurrent HTTP without `p-limit(1)`:** would burst drom and trip block-detection.
-- **Hot-link source images (PITFALLS Pitfall 10):** explicitly out — Phase 1 downloads + WebP-encodes locally; Phase 3 rehosts to S3.
+- **Hot-link source images (PITFALLS Pitfall 10):** explicitly out — Phase 1 downloads + WebP-encodes locally; Phase 4 rehosts to S3.
 - **Single-cookie-jar-shared-with-image-fetches:** drom image CDN (`s.auto.drom.ru`) is a different host; cookieJar should still work (it's host-scoped) — no special handling.
 - **Skipping JS-rendered pages:** verified via live probe — drom catalog pages do NOT require JS for any of brand list / model list / generation list / generation page. Plain HTTP + Cheerio is sufficient.
 
@@ -797,7 +797,7 @@ export async function pointCurrentAt(runDir: string): Promise<void> {
 
 ### Pitfall 1: drom DOM regression silently produces empty `models.json`
 
-**What goes wrong:** drom changes a class name or moves the spec table from `<table>` to `<dl>`. Cheerio selectors return `null`. Validation passes (zod allows `body_types: []`). `models.json` has 50K rows but every row has empty arrays — Phase 3 importer happily writes garbage rows.
+**What goes wrong:** drom changes a class name or moves the spec table from `<table>` to `<dl>`. Cheerio selectors return `null`. Validation passes (zod allows `body_types: []`). `models.json` has 50K rows but every row has empty arrays — Phase 4 importer happily writes garbage rows.
 
 **Why it happens:** Permissive zod schemas (`array(string).default([])`) hide the failure.
 
@@ -841,21 +841,21 @@ export async function pointCurrentAt(runDir: string): Promise<void> {
 
 **How to avoid:** **Defensive `sharp(buf, { failOnError: true, limitInputPixels: 50_000_000 })`.** 50 megapixels is well above typical car photos; anything over is suspect (and probably not a useful hero). Test with the largest drom hero image observed.
 
-### Pitfall 6: Phase 3 importer breaks because Phase 1 schema drifts
+### Pitfall 6: Phase 4 importer breaks because Phase 1 schema drifts
 
-**What goes wrong:** Phase 1 ships v1 of `models.json` schema; Phase 3 begins; someone adds a field to Phase 1's drom parser without updating SCHEMA.md; Phase 3 importer reads stale schema; data drift.
+**What goes wrong:** Phase 1 ships v1 of `models.json` schema; Phase 4 begins; someone adds a field to Phase 1's drom parser without updating SCHEMA.md; Phase 4 importer reads stale schema; data drift.
 
 **Why it happens:** Schema lives in two places (zod + SCHEMA.md).
 
 **How to avoid:** **SCHEMA.md is generated from the zod schema** via a `scripts/build-schema-md.ts` invocation in CI/pre-commit. Or manually keep SCHEMA.md as a derived doc with a comment "edit `server/scrapers/shared/types.ts` instead". Phase 1 plan should include this consistency check as a verification step.
 
-### Pitfall 7: Symlink breaks Phase 3 importer that uses `path.realpath`
+### Pitfall 7: Symlink breaks Phase 4 importer that uses `path.realpath`
 
-**What goes wrong:** Phase 3's `pnpm import:scraped` reads `data/scraped/drom/current/models.json`, calls `fs.realpathSync()` for logging, and the path is now `data/scraped/drom/2026-04-28T07-30-00Z/models.json`. Phase 3 importer caches that real path and re-uses it across runs — but the symlink target changed.
+**What goes wrong:** Phase 4's `pnpm import:scraped` reads `data/scraped/drom/current/models.json`, calls `fs.realpathSync()` for logging, and the path is now `data/scraped/drom/2026-04-28T07-30-00Z/models.json`. Phase 4 importer caches that real path and re-uses it across runs — but the symlink target changed.
 
 **Why it happens:** `realpath` resolves symlinks; if the importer assumes the resolved path is stable, it gets stale.
 
-**How to avoid:** **Phase 3 importer MUST always re-resolve `current/` per invocation** — never cache the realpath. Document this contract in `data/scraped/README.md` Section "How Phase 3 will consume". Phase 1 cannot enforce this technically, only contractually.
+**How to avoid:** **Phase 4 importer MUST always re-resolve `current/` per invocation** — never cache the realpath. Document this contract in `data/scraped/README.md` Section "How Phase 4 will consume". Phase 1 cannot enforce this technically, only contractually.
 
 ---
 
@@ -1007,7 +1007,7 @@ export async function pointCurrentAt(runDir: string): Promise<void> {
    │  P-22  Live smoke run: 1 brand only (e.g., LADA — small + RU)       │ depends on: P-19, P-21
    │        Verify report.json, current/ symlink, no blocks, no errors. │
    │  P-23  Full backfill run (background, 1–2 weeks)                    │ depends on: P-22
-   │        Watched but not blocking — Phase 2/3 can begin in parallel. │
+   │        Watched but not blocking — Phase 3/3 can begin in parallel. │
    └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1015,7 +1015,7 @@ export async function pointCurrentAt(runDir: string): Promise<void> {
 
 **Wave 1 sequencing:** Parsers (P-15..P-18) depend on fixtures (P-14); orchestrator (P-19) depends on all parsers + Wave 0 modules; integration test (P-20) depends on orchestrator.
 
-**Wave 2 timing:** P-22 (smoke run) is on the critical path of Phase 1 completion. P-23 (full backfill) is *not* on the critical path — Phase 2 (Compliance & Infra) and Phase 3 (Schema + API) can begin while P-23 runs in the background. Phase 3's importer eventually consumes whatever `current/` points at when it executes; if P-23 hasn't finished, Phase 3 imports a partial dataset and re-imports later. This is fine.
+**Wave 2 timing:** P-22 (smoke run) is on the critical path of Phase 1 completion. P-23 (full backfill) is *not* on the critical path — Phase 3 (Compliance & Infra) and Phase 4 (Schema + API) can begin while P-23 runs in the background. Phase 4's importer eventually consumes whatever `current/` points at when it executes; if P-23 hasn't finished, Phase 4 imports a partial dataset and re-imports later. This is fine.
 
 ---
 
@@ -1071,13 +1071,13 @@ export async function pointCurrentAt(runDir: string): Promise<void> {
 **Mitigation:**
 - Researcher fully ruled out the API path with verbatim doc evidence (Section 2). If founder Денис wants a second confirmation, propose a short email to drom partner support: "Does your partner API expose `/catalog` master-models data, or only listings sync?" Estimated reply latency: 3–5 business days. **Recommendation:** Don't block Wave 2 on this; proceed with polite scrape; if drom replies positively before backfill finishes, plan a Phase 1.x switch.
 
-### Risk 7: Phase 1 runs over schedule and blocks Phase 3
+### Risk 7: Phase 1 runs over schedule and blocks Phase 4
 
 **Probability:** MEDIUM (1–2 weeks of polite scraping + DOM debugging is hard to estimate precisely).
-**Impact:** MEDIUM (Phase 3 importer can't be tested end-to-end without drom data).
+**Impact:** MEDIUM (Phase 4 importer can't be tested end-to-end without drom data).
 **Mitigation:**
-- Phase 3 schema design does NOT depend on a complete drom run — it depends on the **schema contract** (`SCHEMA.md`), which is a Wave 1 deliverable (P-21). Phase 3 can begin work immediately after P-21.
-- Smoke run (P-22) produces a small but valid `models.json` for Phase 3 development tests. Full backfill (P-23) is not on Phase 3's critical path.
+- Phase 4 schema design does NOT depend on a complete drom run — it depends on the **schema contract** (`SCHEMA.md`), which is a Wave 1 deliverable (P-21). Phase 4 can begin work immediately after P-21.
+- Smoke run (P-22) produces a small but valid `models.json` for Phase 4 development tests. Full backfill (P-23) is not on Phase 4's critical path.
 
 ---
 
@@ -1091,7 +1091,7 @@ export async function pointCurrentAt(runDir: string): Promise<void> {
 | A4 | Generation slug regex `g_(\d{4,6})_(\d+)` covers all drom generation URLs | Section 3 (`parse-generation-list.ts`) | LOW — pattern observed on multiple generation pages (G05: g_2018_8395, F15: g_2013_2087, E53: g_1999_5122, G05-LCI: g_202304_18115). The 6-digit form (202304) suggests YYYYMM. Worst case: regex misses some generations; add to fixtures + relax regex. |
 | A5 | drom robots.txt has no `Crawl-delay` for `User-agent: *` (only AhrefsBot has `Crawl-delay: 1`) | Section 4 (D-14 honor `Crawl-delay`) | LOW — verified live. Implementation must still parse robots.txt at run start and respect any future `Crawl-delay` value if drom adds one for `*`. |
 | A6 | pnpm migration will not break Vite SPA build | Section 11, Risk 3 | LOW — pnpm 10.x is broadly used with Vite + React; 3-dep tree minimizes peer-dep risk. Verify via `pnpm dev` + `pnpm build` smoke before lockfile commit. |
-| A7 | macOS APFS `rename()` over an existing symlink is atomic and replaces the link in-place | Section 9 (`symlink.ts`) | LOW — POSIX semantics; if it fails, `lstat` + `unlink` + `symlink` is the fallback (tiny window where readers see no symlink — acceptable since Phase 3 importer is not concurrent with Phase 1 runs). |
+| A7 | macOS APFS `rename()` over an existing symlink is atomic and replaces the link in-place | Section 9 (`symlink.ts`) | LOW — POSIX semantics; if it fails, `lstat` + `unlink` + `symlink` is the fallback (tiny window where readers see no symlink — acceptable since Phase 4 importer is not concurrent with Phase 1 runs). |
 | A8 | CBR XML `<VunitRate>` is present for all currencies (USD/EUR/JPY/KRW/CNY/AED) | Section 5 | LOW — verified live for all 6. Code falls back to `Value/Nominal` math if `VunitRate` is missing for safety. |
 | A9 | drom `description_ru` is always non-empty on a generation page | Pitfall 1 (validator) | MEDIUM — observed on BMW X5 G05 but not exhaustively verified. If empty for some generations, the strict validator would skip them. Two options: (a) loosen the validator (allow empty `description_ru`), (b) keep strict and accept some drop-out. **Recommendation: keep strict for Phase 1; revisit after smoke run if >5% drop-out.** |
 | A10 | drom hero image URLs are publicly accessible without referer/auth | Section 6 | LOW — drom CDN (`s.auto.drom.ru`) is public asset host; verified live URLs like `https://s.auto.drom.ru/i24222/c/photos/generations/500x_bmw_x5_g8395.jpg` resolve directly. If a future hero needs Referer header, add it to image fetch's per-request headers. |
@@ -1108,7 +1108,7 @@ export async function pointCurrentAt(runDir: string): Promise<void> {
 2. **What does `report.json` look like for a stub run?**
    - What we know: stubs return `{status: 'not_implemented'}` and exit 2; no `<run_id>` directory is created.
    - What's unclear: should stubs still write a stub `report.json` somewhere (e.g., `data/scraped/encar/last-attempt.json`) for observability?
-   - RESOLVED: **No.** Stubs are no-ops; the only artifact is the console.warn TODO line and the exit code. Phase 3+ workers will add their own observability surfaces.
+   - RESOLVED: **No.** Stubs are no-ops; the only artifact is the console.warn TODO line and the exit code. Phase 4+ workers will add their own observability surfaces.
 
 3. **What's the policy for pruning old `<run_id>` dirs?**
    - What we know: D-08 says user prunes manually.

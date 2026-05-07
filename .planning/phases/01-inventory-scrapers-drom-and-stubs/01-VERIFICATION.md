@@ -112,7 +112,7 @@ gap_closure_verification:
       - "server/tests/report-html.test.ts (6 tests, all passing): basic disk read + brand string presence; cheerio.load parses without throwing; missing models.json fallback to []; opts.{models,report} override; data-embedding contract; byte-stable snapshot golden"
       - "server/tests/__snapshots__/report-html.test.ts.snap pinned"
       - "data/scraped/drom/current/index.html exists on disk (262KB), regenerated retroactively against the pre-existing smoke-run dir"
-      - "data/scraped/README.md §'Report viewer (index.html) — auto-emitted per run' documents the auto-emission contract; SCHEMA.md §'Report viewer (index.html)' marks as non-canonical and not part of Phase 3 importer contract"
+      - "data/scraped/README.md §'Report viewer (index.html) — auto-emitted per run' documents the auto-emission contract; SCHEMA.md §'Report viewer (index.html)' marks as non-canonical and not part of Phase 4 importer contract"
   - cr_id: "BLOCKER 1 (plan-checker review)"
     title: "Cross-invocation cursor flow undefined — readCursor read from per-runId paths that fresh runs cannot find"
     closed_by: "plan 01-16"
@@ -181,7 +181,7 @@ The phase is functionally complete. The two human-verification items from the pr
 | 7 | Run report JSON captures all D-17 fields | ✓ VERIFIED | (unchanged) `current/report.json` contains all D-17 fields. Plan 01-14 added two new fields: `images_failed` and `image_failure_rate` for CR-06 telemetry; plan 01-15 extended SCHEMA.md to document them. |
 | 8 | Block-detection logic exists; halts run; writes `report.json` with `status:'blocked'` | ✓ VERIFIED | (unchanged) `shared/block-detection.ts` exports `BlockDetector` and `BlockedError`; orchestrator catches `BlockedError`. Plan 01-15 added a `writeReportHtml` call on the BlockedError path so blocked runs also produce an operator viewer. |
 | 9 | Re-running the scraper twice in a row produces a consistent JSON dataset (idempotent). Diff bounded to expected drom-side changes. | ✓ VERIFIED (was PARTIAL) | **Single-run determinism** (unchanged from 2026-04-28): smoke #3 produced a complete clean run with 200 deterministic records. **Resume-path determinism** (newly verified): 5 resume integration tests pin the contract (4 via vi.doMock cursor module per plan 01-13, 1 real-FS test per plan 01-16). All 7 review findings against the resume path (CR-01..CR-04, WR-04, IN-07, BLOCKER 1) closed with code evidence per the `gap_closure_verification:` frontmatter block. |
-| 10 | README at `data/scraped/README.md` explains run, output, stubs, Phase 3 importer | ✓ VERIFIED | (unchanged) Plan 01-12 rewrote §"Crash recovery" to honestly describe the resume contract. Plan 01-15 added §"Report viewer (index.html) — auto-emitted per run". Plan 01-16 updated the directory-layout diagram to show .cursor.json at the brand-root level. |
+| 10 | README at `data/scraped/README.md` explains run, output, stubs, Phase 4 importer | ✓ VERIFIED | (unchanged) Plan 01-12 rewrote §"Crash recovery" to honestly describe the resume contract. Plan 01-15 added §"Report viewer (index.html) — auto-emitted per run". Plan 01-16 updated the directory-layout diagram to show .cursor.json at the brand-root level. |
 
 **Score:** 10 / 10 truths verified (was 9/10 partial)
 
@@ -268,7 +268,7 @@ The phase is functionally complete. The two human-verification items from the pr
 | SCRAPE-10 | ✓ SATISFIED |
 | SCRAPE-11 | ✓ SATISFIED (adapted: JSON cache) |
 
-**Note on REQUIREMENTS.md traceability table:** Same as prior verification — table at REQUIREMENTS.md lines 207-217 still shows SCRAPE-* mapped to "Phase 5"; this is stale per the 2026-04-27 reorder log. Bulk update remains out of scope for this verification.
+**Note on REQUIREMENTS.md traceability table:** Same as prior verification — table at REQUIREMENTS.md lines 207-217 still shows SCRAPE-* mapped to "Phase 6"; this is stale per the 2026-04-27 reorder log. Bulk update remains out of scope for this verification.
 
 ### Anti-Patterns Found
 
@@ -279,7 +279,7 @@ Remaining findings from 01-REVIEW.md (not addressed by these gap-closure plans, 
 | File | Lines | Pattern | Severity | Status |
 |------|-------|---------|----------|--------|
 | `shared/http.ts` | 51-52 | User-Agent string is Chrome 126 (June 2024) — WR-07 | ⚠️ Warning | DEFERRED — not goal-blocking; calendar-reminder candidate |
-| `shared/http.ts` | 19, 41-56 | Module-scoped CookieJar leaks across runs in same Node process — WR-08 | ℹ️ Info | DEFERRED — OK for current CLI one-shot mode; Phase 3 worker process must address |
+| `shared/http.ts` | 19, 41-56 | Module-scoped CookieJar leaks across runs in same Node process — WR-08 | ℹ️ Info | DEFERRED — OK for current CLI one-shot mode; Phase 4 worker process must address |
 | `shared/brand-aliases.ts` | 17-48 | mergeAliases lacks concurrency guard — WR-11 | ℹ️ Info | DEFERRED — OK for documented single-process operation |
 | `shared/fx.ts` | various | `firstRun` flag conflates "no resume cursor" with "no ever-cached file" — WR-01 | ⚠️ Warning | DEFERRED — does not affect the delivered SC-9 contract |
 | `parse-generation-page.ts` | 67-72 | `parseEngineLine` litre regex edge case — WR-02 | ⚠️ Warning | DEFERRED — does not affect goal achievement |
@@ -306,7 +306,7 @@ Both prior gaps are closed with code-on-disk evidence:
 - **Gap 1** (resume idempotency): closed by plans 10/11/12/13/14/16 — all 6 critical review findings (CR-01..CR-06), the supporting WR-04 robustness finding, the IN-07 integration-coverage gap, AND the plan-checker-discovered BLOCKER 1 cross-invocation cursor flow are verified closed at named file:line ranges in this verification's frontmatter.
 - **Gap 2** (per-run HTML viewer): closed by plan 15 — `writeReportHtml` shared module wired into the orchestrator on success/blocked/error paths, with backward-compat CLI script preserved for retroactive generation against pre-plan-15 runs.
 
-Phase 1 is complete. Phase 2 (Compliance & Infra) and Phase 3 (Schema/API/importer) can begin.
+Phase 1 is complete. Phase 3 (Compliance & Infra) and Phase 4 (Schema/API/importer) can begin.
 
 ---
 

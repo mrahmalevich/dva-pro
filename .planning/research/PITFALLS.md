@@ -398,7 +398,7 @@ The 5-question quiz catches every visitor including price-shopping browsers, tir
 ### Pitfall 13: Country enum hardcoded, breaks UI when adding US/AE/EU later
 
 **What goes wrong:**
-Current `Country` enum is `'jp' | 'cn' | 'kr'`. PROJECT.md actively expands it to all 6 markets. UI components do `if (country === 'jp') ...` switches. Phase 2 adds `'us' | 'ae' | 'eu'` → flag rendering breaks, filter UI breaks (some markets have empty placeholder cards), PDF templates miss copy for new countries, Bitrix custom field for «Страна» has dropdown of old values, scraper config map is a closed list.
+Current `Country` enum is `'jp' | 'cn' | 'kr'`. PROJECT.md actively expands it to all 6 markets. UI components do `if (country === 'jp') ...` switches. Phase 3 adds `'us' | 'ae' | 'eu'` → flag rendering breaks, filter UI breaks (some markets have empty placeholder cards), PDF templates miss copy for new countries, Bitrix custom field for «Страна» has dropdown of old values, scraper config map is a closed list.
 
 **Why it happens:**
 - Enum-as-switch is the easy path in TypeScript.

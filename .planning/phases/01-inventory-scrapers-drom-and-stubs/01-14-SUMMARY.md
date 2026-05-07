@@ -17,7 +17,7 @@ provides:
   - "Counter-drift integration test pins both gate denominators (parse-only for the 10% gate, image-only for the 20% gate)"
 affects:
   - "Phase 1 plan 15 (HTML viewer + SCHEMA.md docs sweep — picks up the new report.json fields)"
-  - "Phase 3 (importer can trust every image_paths entry corresponds to a WebP on disk)"
+  - "Phase 4 (importer can trust every image_paths entry corresponds to a WebP on disk)"
 
 # Tech tracking
 tech-stack:
@@ -42,7 +42,7 @@ key-decisions:
   - "Image-fetch gate uses bounded threshold (rate > 0.20 AND attempted >= 20) to avoid aborting on a single early CDN hiccup with a small denominator"
   - "image_failure_rate is rounded to 4 decimal places (Math.round(rate * 10000) / 10000) for stable diff in report.json"
   - "extractHeroImageUrl stays exported so drom-parsers tests can derive heroImageUrl from the fixture without coupling to a hard-coded URL"
-  - "On image-fetch failure the orchestrator clears record.image_paths to [] BEFORE serialization — guarantees Phase 3 importer sees no orphan paths"
+  - "On image-fetch failure the orchestrator clears record.image_paths to [] BEFORE serialization — guarantees Phase 4 importer sees no orphan paths"
 
 patterns-established:
   - "Error classification: every report.errors.push site declares its kind, and downstream gates filter by kind to avoid counter-drift"

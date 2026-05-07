@@ -96,7 +96,7 @@ Migrated the repo from npm → pnpm, added the entire Phase 1 backend dep tree (
 - Platform: **darwin-arm64** (Apple Silicon dev machine).
 - libvips: 8.x bundled (sharp@0.34.5 reports `aom 3.13.1`, `cairo 1.18.4`, `freetype 2.14.1`, etc.).
 - Postinstall: completed cleanly via `pnpm.onlyBuiltDependencies` allowlist (no interactive `pnpm approve-builds` prompt).
-- Linux CI parity: `sharp@0.34.5` ships pre-built linux-x64 binaries; Phase 3 worker container should use `node:22-alpine` per CLAUDE.md (musl variants are also pre-built).
+- Linux CI parity: `sharp@0.34.5` ships pre-built linux-x64 binaries; Phase 4 worker container should use `node:22-alpine` per CLAUDE.md (musl variants are also pre-built).
 
 ## Peer-Dep Warnings Observed
 

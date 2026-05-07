@@ -278,7 +278,7 @@ The two sources may disagree:
   orchestrator's `if (gen.hero_image_url && record.image_paths.length > 0)`
   guard at line 180 falls through (because `gen.hero_image_url` is falsy), so
   `images_skipped++` is incremented and **no file is written**. Result:
-  `models.json` references a WebP that doesn't exist on disk, and Phase 3's
+  `models.json` references a WebP that doesn't exist on disk, and Phase 4's
   importer breaks.
 - If `parseGenerationList` finds a hero but `parseGenerationPage`'s extraction
   fails (e.g. drom changes the s.auto.drom.ru CDN host) → `image_paths` is `[]`,
@@ -335,7 +335,7 @@ If drom's image CDN has a bad afternoon and >10% of hero downloads fail, the
 entire run aborts with `final_status: 'error'` and **the symlink is not
 updated, even though every record parsed and validated correctly**. The
 `current/` pointer stays on the previous (potentially weeks-old) run, and the
-new run dir is left orphaned. Phase 3 importer sees stale data.
+new run dir is left orphaned. Phase 4 importer sees stale data.
 
 **Fix:** Track parse errors and image errors separately:
 ```ts
@@ -582,7 +582,7 @@ reminder to refresh.
 **File:** `server/scrapers/shared/http.ts:19, 41-56`
 **Issue:** `const cookieJar = new CookieJar()` at module scope persists for
 the lifetime of the Node process. In CLI mode (one-shot) this is fine. But the
-moment the orchestrator is hosted under any long-lived process (Phase 3's
+moment the orchestrator is hosted under any long-lived process (Phase 4's
 worker, or even a `pnpm scrape <a> && pnpm scrape <b>` sequence on a hot
 module cache), drom-set tracking cookies (`__utma`, `_ym_uid`, etc.) accumulate
 forever and cross-pollinate across scraper instances.
