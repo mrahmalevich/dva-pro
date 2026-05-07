@@ -34,7 +34,7 @@ export const Hero = ({ onOpenQuiz }: { onOpenQuiz: () => void }) => {
       ref={ref}
       onMouseMove={onMove}
       className="grain spotlight-host"
-      style={{ position: 'relative', minHeight: '100vh', background: 'var(--ink)', color: '#fff', overflow: 'hidden', paddingTop: 140 }}>
+      style={{ position: 'relative', minHeight: 640, background: 'var(--ink)', color: '#fff', overflow: 'hidden', paddingTop: 72 }}>
       <div className="spotlight" />
 
       <div style={{
@@ -122,7 +122,7 @@ export const Hero = ({ onOpenQuiz }: { onOpenQuiz: () => void }) => {
           </div>
 
           <Reveal delay={420}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0, marginTop: 96, paddingTop: 32, borderTop: '1px solid var(--line)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0, marginTop: 56, paddingTop: 20, borderTop: '1px solid var(--line)' }}>
               {stats.map((s, i) => (
                 <div key={s.label} style={{ paddingRight: 24, borderRight: i < 3 ? '1px solid var(--line)' : 'none', paddingLeft: i > 0 ? 24 : 0 }}>
                   <div className="stat-num" style={{ color: i % 2 ? 'var(--cyan)' : 'var(--coral)' }}>
