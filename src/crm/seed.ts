@@ -100,6 +100,13 @@ export const SEED: CrmState = {
     { id: 'r3', name: 'Сергей В.', city: 'Краснодар', car: 'BMW M5 Competition', text: 'Заказывал M5 в макс. комплектации. Парни нашли вариант с Гранд Корея за 2 недели, привезли в Краснодар через 38 дней. Документы — чистые, ЭПТС оформили без проблем.', rating: 5 },
   ],
 
+  inTransit: [
+    { id: 'it-bmw-x5',       brand: 'BMW',          model: 'X5 xDrive40i', country: 'kr', status: 'in-transit', statusLabel: 'В пути',         eta: '14 дней',  priceLandedRu: '7 800 000 ₽',  accent: 'coral' },
+    { id: 'it-lexus-lx',     brand: 'Lexus',        model: 'LX 600',       country: 'jp', status: 'customs',    statusLabel: 'На таможне',     eta: '5 дней',   priceLandedRu: '12 400 000 ₽', accent: 'cyan'  },
+    { id: 'it-mercedes-g63', brand: 'Mercedes-AMG', model: 'G63',          country: 'kr', status: 'in-transit', statusLabel: 'В пути',         eta: '21 день',  priceLandedRu: '21 900 000 ₽', accent: 'coral' },
+    { id: 'it-genesis-gv80', brand: 'Genesis',      model: 'GV80 3.5T',    country: 'kr', status: 'ready',      statusLabel: 'Готов к выдаче', eta: 'на руках', priceLandedRu: '6 600 000 ₽',  accent: 'cyan'  },
+  ],
+
   feed: [
     { id: 'feed1', time: '2 мин назад', text: 'Lexus LX 600 — выгружен во Владивостоке', icon: 'truck' },
     { id: 'feed2', time: '14 мин назад', text: 'Genesis GV80 — VIN-проверка пройдена', icon: 'shield' },

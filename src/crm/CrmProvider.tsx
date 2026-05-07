@@ -16,6 +16,7 @@ function loadInitialState(): CrmState {
       faq: parsed.faq ?? SEED.faq,
       reviews: parsed.reviews ?? SEED.reviews,
       feed: parsed.feed ?? SEED.feed,
+      inTransit: parsed.inTransit ?? SEED.inTransit,
       settings: { ...SEED.settings, ...(parsed.settings ?? {}) },
       leads: parsed.leads ?? SEED.leads,
     };
