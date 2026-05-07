@@ -18,10 +18,10 @@ const VIEWPORT = { width: 1280, height: 4000 };
 const REF_W = 605;
 const REF_H = 1280;
 const DIFF_THRESHOLD = 0.22; // 22% — empirical as-shipped floor 18.74% + 3.26pp safety band; see 02-RESEARCH.md §3
-const DEV_URL = 'http://127.0.0.1:5173/';
+const DEV_URL = 'http://127.0.0.1:5174/';
 
 async function bringUpDevServer(): Promise<ChildProcess> {
-  const child = spawn('pnpm', ['exec', 'vite', '--port', '5173', '--host', '127.0.0.1'], {
+  const child = spawn('pnpm', ['exec', 'vite', '--port', '5174', '--host', '127.0.0.1'], {
     stdio: 'pipe',
   });
   for (let i = 0; i < 30; i++) {
