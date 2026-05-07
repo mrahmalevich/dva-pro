@@ -14,7 +14,7 @@ export const Process = ({ onOpenQuiz }: { onOpenQuiz: () => void }) => {
     <section id="process" style={{ background: 'var(--ink)', color: '#fff' }}>
       <div className="container">
         <Reveal>
-          <div style={{ marginBottom: 64 }}>
+          <div style={{ marginBottom: 32 }}>
             <div className="num-marker" style={{ marginBottom: 14 }}>03 / Как мы работаем</div>
             <h2 className="h1" style={{ maxWidth: 1000 }}>
               Шесть шагов от&nbsp;заявки<br />до&nbsp;ключей. <span className="outline-italic">Без сюрпризов.</span>
@@ -31,7 +31,7 @@ export const Process = ({ onOpenQuiz }: { onOpenQuiz: () => void }) => {
                   onClick={() => setActive(i)}
                   style={{
                     width: '100%', textAlign: 'left',
-                    display: 'flex', gap: 28, padding: '28px 0',
+                    display: 'flex', gap: 28, padding: '20px 0',
                     borderTop: '1px solid var(--line)',
                     borderBottom: i === steps.length - 1 ? '1px solid var(--line)' : 'none',
                     transition: 'padding-left .25s ease, background .25s',
