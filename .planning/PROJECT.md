@@ -111,4 +111,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-26 after research synthesis (USS exclusion + backend stack lock)*
+*Last updated: 2026-05-07 after Phase 02.1 (visual density densification) complete — landing page now ~7651 px, in the 7000–8000 px D-01 target band.*
