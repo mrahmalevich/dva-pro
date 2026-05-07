@@ -1,6 +1,6 @@
 // server/tests/landing-page-golden.test.ts
-// Phase 02.1 D-03 / D-03a: structural-drift guard, re-tuned post-densification.
-// Threshold tuned to 0.28 against post-Wave-1 baseline of 24.52% (see 02.1-RESEARCH.md §6 + 02.1-VERIFICATION.md).
+// Phase 02.2 D-08 / D-08a: structural-drift guard, re-baselined post-section-topology-restructure.
+// Threshold kept at 0.28 — measured post-02.2 floor 26.18%; see 02.2-VERIFICATION.md.
 // Test self-orchestrates Vite dev server bring-up; no external orchestration required.
 
 import { describe, it, expect } from 'vitest';
@@ -17,7 +17,7 @@ const DIFF_PATH = resolve('server/tests/__snapshots__/landing-page-golden.diff.p
 const VIEWPORT = { width: 1280, height: 4000 };
 const REF_W = 605;
 const REF_H = 1280;
-const DIFF_THRESHOLD = 0.28; // 28% — empirical post-Wave-1 floor 24.52% + 3pp safety band; see 02.1-RESEARCH.md §6
+const DIFF_THRESHOLD = 0.28; // 28% — empirical post-02.2 floor 26.18% + 1.82pp headroom; see 02.2-VERIFICATION.md
 const DEV_URL = 'http://127.0.0.1:5174/';
 
 async function bringUpDevServer(): Promise<ChildProcess> {
@@ -37,9 +37,9 @@ async function bringUpDevServer(): Promise<ChildProcess> {
   throw new Error('dev server did not start within 30s');
 }
 
-describe('landing-page-golden screenshot golden (Phase 02 D-02)', () => {
+describe('landing-page-golden screenshot golden (Phase 02.2 D-08)', () => {
   it(
-    'SPA matches design-reference.png within 22% structural-drift threshold',
+    'SPA matches design-reference.png within 28% structural-drift threshold',
     async () => {
       const dev = await bringUpDevServer();
       let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
