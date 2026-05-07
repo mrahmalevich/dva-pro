@@ -141,6 +141,16 @@ Plans:
 
 ---
 
+### Phase 02.2: Match landing-page section topology and styling to design-reference.png — reorder/restructure existing sections so the rendered SPA matches the reference shot at the section level. Concrete scope: (1) move LeadMagnet (existing component) into a quiz-teaser slot BETWEEN Hero/Marquee and Catalog; (2) restructure Process from 6 vertical steps to 4 horizontal steps with clean numbered badges; (3) remove or hide Founders block (not in design); (4) repurpose FeedStrip or add an in-transit cars section ('Реальные авто в пути') with 4 cards and status pills; (5) ensure Reviews ('Отзывы наших клиентов') renders visibly with 3 video review cards (seed CrmProvider data if Reviews currently hides on empty state); (6) add a final CTA section before Footer matching 'Привезём вам автомобиль из любого порта мира' copy + dark hero-style block + quiz button. Keep Faq, Footer, FloatingDock, QuizModal untouched. Goal: visual section topology of the SPA matches design-reference.png; pixelmatch threshold may need re-tuning post-restructure (acceptable). No new dependencies. Mobile breakpoints not regressed. (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Requirements**: TBD
+**Depends on:** Phase 2
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 02.2 to break down)
+
 ### Phase 02.1: tighten visual density to design-reference fidelity (INSERTED)
 
 **Status:** Complete 2026-05-07 — see `.planning/phases/02.1-tighten-visual-density-to-design-reference-fidelity/02.1-VERIFICATION.md`. Final fullPage height **7 651 px** in 7000–8000 band; final pixelmatch floor **24.52%** at threshold **0.28** (down from Phase 2's 11 847 px harness baseline; D-03b floor expectation overridden — see VERIFICATION.md tradeoffs). All Phase 2 G-01..G-11 contracts preserved; mobile breakpoint untouched (D-04a verified via `git diff` audit anchored on base SHA `4b104f7`).
