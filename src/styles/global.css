@@ -596,7 +596,7 @@ section { padding: 140px 0; position: relative; }
   .marquee-track span { font-size: 22px !important; }
 
   section { padding: 64px 0 !important; }
-  .container { padding: 0 18px !important; }
+  .container { padding: 0 20px !important; }
 
   .container > div[style*="gap: 64"],
   .container > div[style*="gap: 80"],
