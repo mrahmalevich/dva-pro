@@ -147,7 +147,7 @@ Plans:
 **Goal:** Vertical-density compression pass on the public landing page (10 sections + Hero + Footer) — cut canonical desktop section padding 140 → 72, Hero `min-height: 100vh → 640px` + `paddingTop: 140 → 72` + stats-strip rhythm trim, top-3 within-section trims (Catalog/Process/Founders), and re-tune the puppeteer + sharp + pixelmatch screenshot golden threshold against the post-densification empirical floor. Targets fullPage height 7000–8000 px (acceptable band 6500–8500 per D-01a) — down from Phase 2's ~11 847 px capture-harness baseline. Mobile `@media (max-width: 720px)` blocks are OFF-LIMITS (D-04a). QuizModal D-03 alpha alignment from Phase 2 stays untouched (D-04). All Phase 2 G-01..G-11 contracts preserved.
 **Requirements**: none — Phase 02.1 owns no REQ-* IDs (verified). Coverage mapped via locked decisions D-01..D-04c in `02.1-CONTEXT.md`.
 **Depends on:** Phase 2
-**Plans:** 6 plans across 2 waves (all complete)
+**Plans:** 6/6 plans complete
 
 Plans:
 - [x] 02.1-01-PLAN.md — Wave 1: global.css section padding cut 140 → 72 (D-02)
@@ -298,7 +298,7 @@ Plans:
 | 01.1. extend-drom-scrape-fields | 10/10 | Complete | 2026-04-30 |
 | 01.2. extend-complectation-fields | 6/6 | Complete | 2026-05-03 |
 | 2. Redesign from Screenshot | 5/5 | Complete | 2026-05-07 |
-| 02.1. tighten visual density | 6/6 | Complete | 2026-05-07 |
+| 02.1. tighten visual density | 6/6 | Complete    | 2026-05-07 |
 | 3. Compliance & Infra Foundation | 0/0 | Not started | — |
 | 4. Schema, API Skeleton & Country Registry | 0/0 | Not started | — |
 | 5. Frontend Integration, Consent & Legal | 0/0 | Not started | — |
