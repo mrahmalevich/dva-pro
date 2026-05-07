@@ -22,3 +22,6 @@ data/scraped/fx/cbr-*.json
 package-lock.json
 # Phase 01.1 — screenshot diff PNGs (operator-inspection-only; never committed)
 server/tests/__snapshots__/*.diff.png
+# Phase 02.1 — transient measurement artifacts (operator-inspection-only; never committed)
+tmp/
+.planning/phases/*/.[0-9]*-base-sha
