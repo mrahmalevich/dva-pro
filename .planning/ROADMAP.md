@@ -141,6 +141,16 @@ Plans:
 
 ---
 
+### Phase 02.1: tighten visual density to design-reference fidelity (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Requirements**: TBD
+**Depends on:** Phase 2
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 02.1 to break down)
+
 ### Phase 3: Compliance & Infra Foundation
 
 **Goal:** Поднять российскую инфраструктуру и юридический фундамент так, чтобы ни одна последующая фаза не блокировалась 152-ФЗ или email-deliverability календарём.
