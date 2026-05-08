@@ -3,7 +3,7 @@ import { Drawer, EmptyState, Field, RowActions, SectionHeader } from './EditorSh
 import { useCrm } from '../crm/CrmProvider';
 import type { Review } from '../crm/types';
 
-const blank = (id: string): Review => ({ id, name: '', city: '', car: '', text: '', rating: 5 });
+const blank = (id: string): Review => ({ id, name: '', city: '', car: '', text: '', rating: 5, avatar: '', date: '', platform: 'yandex' });
 
 export const ReviewsAdmin = () => {
   const { state, upsertReview, deleteReview, newId } = useCrm();

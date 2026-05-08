@@ -1,6 +1,12 @@
 import { Icon, Reveal } from '../components/atoms';
 import { useCrm } from '../crm/CrmProvider';
 
+const PLATFORM_META = {
+  yandex: { label: 'Яндекс',  bg: '#FC3F1D', fg: '#fff' },
+  avito:  { label: 'Авито',   bg: '#0AF',    fg: '#fff' },
+  autoru: { label: 'Auto.ru', bg: '#C00',    fg: '#fff' },
+} as const;
+
 export const Reviews = () => {
   const { state } = useCrm();
   if (state.reviews.length === 0) return null;
@@ -8,46 +14,76 @@ export const Reviews = () => {
     <section id="reviews" style={{ background: '#0a0a09', color: '#fff' }}>
       <div className="container">
         <Reveal>
-          <div style={{ marginBottom: 64 }}>
+          <div style={{ marginBottom: 32 }}>
             <div className="num-marker" style={{ marginBottom: 14 }}>05 / Отзывы</div>
             <h2 className="h1">
-              Реальные истории.<br />
+              Отзывы наших клиентов.<br />
               <span className="outline-italic">Не&nbsp;по&nbsp;скрипту.</span>
             </h2>
           </div>
         </Reveal>
 
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(state.reviews.length, 3)}, 1fr)`, gap: 0 }}>
-          {state.reviews.slice(0, 3).map((r, i) => (
-            <Reveal key={r.id} delay={i * 100}>
-              <div style={{
-                background: '#0F0F0E', padding: 32, height: '100%',
-                border: '1px solid var(--line)',
-                borderLeft: i > 0 ? 'none' : '1px solid var(--line)',
-                color: '#fff',
-                display: 'flex', flexDirection: 'column',
-              }}>
-                <div style={{ display: 'flex', gap: 4, marginBottom: 20, color: 'var(--coral)' }}>
-                  {Array.from({ length: r.rating }).map((_, k) => <Icon key={k} name="star" size={16} />)}
-                </div>
-                <p style={{ fontSize: 17, lineHeight: 1.5, flex: 1, marginBottom: 28, fontWeight: 400 }}>«{r.text}»</p>
-                <div style={{ display: 'flex', gap: 14, alignItems: 'center', paddingTop: 20, borderTop: '1px solid var(--line)' }}>
-                  <div style={{ width: 44, height: 44, background: i % 2 ? 'var(--cyan)' : 'var(--coral)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 18, fontStyle: 'italic' }}>
-                    {r.name.charAt(0)}
+        <div className="reviews-grid" style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(state.reviews.length, 3)}, 1fr)`, gap: 24 }}>
+          {state.reviews.slice(0, 3).map((r, i) => {
+            const platform = PLATFORM_META[r.platform];
+            return (
+              <Reveal key={r.id} delay={i * 80}>
+                <div className="card" style={{
+                  background: '#0F0F0E', padding: 24, height: '100%',
+                  color: '#fff',
+                  display: 'flex', flexDirection: 'column',
+                }}>
+                  {/* Header: avatar + name/city/car */}
+                  <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 16 }}>
+                    <img
+                      src={r.avatar}
+                      alt={r.name}
+                      loading="lazy"
+                      width={48}
+                      height={48}
+                      style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid var(--line-strong)' }}
+                    />
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 15, lineHeight: 1.2 }}>{r.name}</div>
+                      <div style={{ fontSize: 12, color: 'var(--mute)', marginTop: 2 }}>{r.city}</div>
+                      <div style={{ fontSize: 12, color: 'var(--mute-2)', marginTop: 2 }}>{r.car}</div>
+                    </div>
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: 14 }}>{r.name}</div>
-                    <div style={{ fontSize: 12, color: 'var(--mute)' }}>{r.city} · {r.car}</div>
+
+                  {/* Stars */}
+                  <div style={{ display: 'flex', gap: 2, marginBottom: 14, color: '#F5C518' }}>
+                    {Array.from({ length: r.rating }).map((_, k) => <Icon key={k} name="star" size={14} />)}
                   </div>
-                  <button aria-label="Видео-отзыв" style={{ width: 36, height: 36, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--line-strong)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                    <Icon name="play" size={12} />
-                  </button>
+
+                  {/* Body */}
+                  <p style={{ fontSize: 14, lineHeight: 1.5, flex: 1, marginBottom: 20, color: 'rgba(255,255,255,0.85)', fontWeight: 400 }}>
+                    {r.text}
+                  </p>
+
+                  {/* Footer: date + platform tag */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 14, borderTop: '1px solid var(--line)' }}>
+                    <span style={{ fontSize: 12, color: 'var(--mute)' }}>{r.date}</span>
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center',
+                      padding: '4px 10px', borderRadius: 4,
+                      background: platform.bg, color: platform.fg,
+                      fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
+                    }}>
+                      {platform.label}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </Reveal>
-          ))}
+              </Reveal>
+            );
+          })}
         </div>
       </div>
+
+      <style>{`
+        @media (max-width: 720px) {
+          #reviews .reviews-grid { grid-template-columns: 1fr !important; gap: 16px !important; }
+        }
+      `}</style>
     </section>
   );
 };

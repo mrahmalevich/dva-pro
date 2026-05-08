@@ -42,6 +42,9 @@ export interface Review {
   car: string;
   text: string;
   rating: number;
+  avatar: string;
+  date: string;
+  platform: 'yandex' | 'avito' | 'autoru';
 }
 
 export interface FeedItem {

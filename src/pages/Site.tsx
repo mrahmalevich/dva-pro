@@ -5,7 +5,6 @@ import { Marquee } from '../sections/Marquee';
 import { LeadMagnet } from '../sections/LeadMagnet';
 import { Catalog } from '../sections/Catalog';
 import { Process } from '../sections/Process';
-import { InTransit } from '../sections/InTransit';
 import { Reviews } from '../sections/Reviews';
 import { CtaShipFromAnywhere } from '../sections/CtaShipFromAnywhere';
 import { Faq } from '../sections/Faq';
@@ -26,7 +25,6 @@ export const Site = () => {
       <LeadMagnet onOpenQuiz={open} />
       <Catalog onOpenQuiz={open} />
       <Process onOpenQuiz={open} />
-      <InTransit />
       <Reviews />
       <CtaShipFromAnywhere onOpenQuiz={open} />
       <Faq />
