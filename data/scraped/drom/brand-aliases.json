@@ -1,4 +1,226 @@
 {
+  "bmw": {
+    "ru": "BMW",
+    "latin": "BMW",
+    "models": {
+      "321": {
+        "ru": "321",
+        "latin": "321"
+      },
+      "326": {
+        "ru": "326",
+        "latin": "326"
+      },
+      "340": {
+        "ru": "340",
+        "latin": "340"
+      },
+      "503": {
+        "ru": "503",
+        "latin": "503"
+      },
+      "600": {
+        "ru": "600",
+        "latin": "600"
+      },
+      "02_e10": {
+        "ru": "02 (E10)",
+        "latin": "02 (E10)"
+      },
+      "1-series": {
+        "ru": "1-Series",
+        "latin": "1-Series"
+      },
+      "1m": {
+        "ru": "1M",
+        "latin": "1M"
+      },
+      "2-series": {
+        "ru": "2-Series",
+        "latin": "2-Series"
+      },
+      "2-series_active_tourer": {
+        "ru": "2-Series Active Tourer",
+        "latin": "2-Series Active Tourer"
+      },
+      "2-series_gran_tourer": {
+        "ru": "2-Series Gran Tourer",
+        "latin": "2-Series Gran Tourer"
+      },
+      "3-series": {
+        "ru": "3-Series",
+        "latin": "3-Series"
+      },
+      "3-series_gran_turismo": {
+        "ru": "3-Series Gran Turismo",
+        "latin": "3-Series Gran Turismo"
+      },
+      "4-series": {
+        "ru": "4-Series",
+        "latin": "4-Series"
+      },
+      "5-series": {
+        "ru": "5-Series",
+        "latin": "5-Series"
+      },
+      "5-series_gran_turismo": {
+        "ru": "5-Series Gran Turismo",
+        "latin": "5-Series Gran Turismo"
+      },
+      "6-series": {
+        "ru": "6-Series",
+        "latin": "6-Series"
+      },
+      "6-series_gran_turismo": {
+        "ru": "6-Series Gran Turismo",
+        "latin": "6-Series Gran Turismo"
+      },
+      "7-series": {
+        "ru": "7-Series",
+        "latin": "7-Series"
+      },
+      "8-series": {
+        "ru": "8-Series",
+        "latin": "8-Series"
+      },
+      "e3": {
+        "ru": "E3",
+        "latin": "E3"
+      },
+      "e9": {
+        "ru": "E9",
+        "latin": "E9"
+      },
+      "engine": {
+        "ru": "Двигатели BMW",
+        "latin": "Двигатели BMW"
+      },
+      "frame": {
+        "ru": "Кузова BMW",
+        "latin": "Кузова BMW"
+      },
+      "i3": {
+        "ru": "i3",
+        "latin": "i3"
+      },
+      "i4": {
+        "ru": "i4",
+        "latin": "i4"
+      },
+      "i5": {
+        "ru": "i5",
+        "latin": "i5"
+      },
+      "i7": {
+        "ru": "i7",
+        "latin": "i7"
+      },
+      "i8": {
+        "ru": "i8",
+        "latin": "i8"
+      },
+      "isetta": {
+        "ru": "Isetta",
+        "latin": "Isetta"
+      },
+      "ix": {
+        "ru": "iX",
+        "latin": "iX"
+      },
+      "ix1": {
+        "ru": "iX1",
+        "latin": "iX1"
+      },
+      "ix2": {
+        "ru": "iX2",
+        "latin": "iX2"
+      },
+      "ix3": {
+        "ru": "iX3",
+        "latin": "iX3"
+      },
+      "m1": {
+        "ru": "M1",
+        "latin": "M1"
+      },
+      "m2": {
+        "ru": "M2",
+        "latin": "M2"
+      },
+      "m3": {
+        "ru": "M3",
+        "latin": "M3"
+      },
+      "m4": {
+        "ru": "M4",
+        "latin": "M4"
+      },
+      "m5": {
+        "ru": "M5",
+        "latin": "M5"
+      },
+      "m6": {
+        "ru": "M6",
+        "latin": "M6"
+      },
+      "m8": {
+        "ru": "M8",
+        "latin": "M8"
+      },
+      "neue_klasse": {
+        "ru": "Neue Klasse",
+        "latin": "Neue Klasse"
+      },
+      "x1": {
+        "ru": "X1",
+        "latin": "X1"
+      },
+      "x2": {
+        "ru": "X2",
+        "latin": "X2"
+      },
+      "x3": {
+        "ru": "X3",
+        "latin": "X3"
+      },
+      "x4": {
+        "ru": "X4",
+        "latin": "X4"
+      },
+      "x5": {
+        "ru": "X5",
+        "latin": "X5"
+      },
+      "x6": {
+        "ru": "X6",
+        "latin": "X6"
+      },
+      "x7": {
+        "ru": "X7",
+        "latin": "X7"
+      },
+      "xm": {
+        "ru": "XM",
+        "latin": "XM"
+      },
+      "z1": {
+        "ru": "Z1",
+        "latin": "Z1"
+      },
+      "z3": {
+        "ru": "Z3",
+        "latin": "Z3"
+      },
+      "z4": {
+        "ru": "Z4",
+        "latin": "Z4"
+      },
+      "z8": {
+        "ru": "Z8",
+        "latin": "Z8"
+      }
+    }
+  },
   "lada": {
     "ru": "Лада",
     "latin": "Лада",
