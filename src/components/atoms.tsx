@@ -37,8 +37,8 @@ export const Icon = ({ name, size = 20, stroke = 1.6 }: { name: IconName; size?:
     case 'truck': return <svg viewBox="0 0 24 24" {...s}><path d="M1 8h13v9H1zM14 11h5l3 4v2h-8z" /><circle cx="6" cy="18" r="2" /><circle cx="18" cy="18" r="2" /></svg>;
     case 'globe': return <svg viewBox="0 0 24 24" {...s}><circle cx="12" cy="12" r="10" /><path d="M2 12h20M12 2c3 3 4.5 6 4.5 10S15 19 12 22M12 2c-3 3-4.5 6-4.5 10S9 19 12 22" /></svg>;
     case 'sparkle': return <svg viewBox="0 0 24 24" {...s}><path d="M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z" /></svg>;
-    case 'play': return <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>;
-    case 'star': return <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3 7 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z" /></svg>;
+    case 'play': return <svg viewBox="0 0 24 24" fill="currentColor" width={size} height={size}><path d="M8 5v14l11-7z" /></svg>;
+    case 'star': return <svg viewBox="0 0 24 24" fill="currentColor" width={size} height={size}><path d="M12 2l3 7 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z" /></svg>;
     case 'wallet': return <svg viewBox="0 0 24 24" {...s}><path d="M3 7v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9H5a2 2 0 0 1 0-4h13" /><circle cx="17" cy="14" r="1.5" /></svg>;
     case 'gauge': return <svg viewBox="0 0 24 24" {...s}><path d="M12 22a10 10 0 1 0-10-10" /><path d="M12 12l5-5" /></svg>;
     case 'calendar': return <svg viewBox="0 0 24 24" {...s}><rect x="3" y="5" width="18" height="16" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>;

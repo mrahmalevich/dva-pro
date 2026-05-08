@@ -51,8 +51,8 @@ export const Reviews = () => {
                   </div>
 
                   {/* Stars */}
-                  <div style={{ display: 'flex', gap: 1, marginBottom: 14, color: '#FCB400' }}>
-                    {Array.from({ length: r.rating }).map((_, k) => <Icon key={k} name="star" size={11} />)}
+                  <div style={{ display: 'flex', gap: 4, marginBottom: 14, color: 'var(--coral)' }}>
+                    {Array.from({ length: r.rating }).map((_, k) => <Icon key={k} name="star" size={12} />)}
                   </div>
 
                   {/* Body */}
