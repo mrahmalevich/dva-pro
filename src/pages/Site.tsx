@@ -13,13 +13,12 @@ import { QuizModal } from '../quiz/QuizModal';
 
 export const Site = () => {
   const [quizOpen, setQuizOpen] = useState(false);
-  const [lang, setLang] = useState<'ru' | 'en'>('ru');
   const open = () => setQuizOpen(true);
   const close = () => setQuizOpen(false);
 
   return (
     <>
-      <Nav onOpenQuiz={open} lang={lang} setLang={setLang} />
+      <Nav />
       <Hero onOpenQuiz={open} />
       <Marquee />
       <LeadMagnet onOpenQuiz={open} />

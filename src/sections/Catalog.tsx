@@ -105,7 +105,7 @@ export const Catalog = ({ onOpenQuiz }: { onOpenQuiz: () => void }) => {
 
         <Reveal>
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 14, marginTop: 32 }}>
-            <button className="btn btn-primary btn-lg" onClick={onOpenQuiz}>
+            <button className="btn btn-primary btn-lg btn-wrap" onClick={onOpenQuiz}>
               Не нашли своё? Подберём под ваши параметры <Icon name="arrow-right" size={16} />
             </button>
           </div>
