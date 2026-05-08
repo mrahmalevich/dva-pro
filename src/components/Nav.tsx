@@ -34,7 +34,7 @@ export const Nav = () => {
         backdropFilter: scrolled || menuOpen ? 'blur(18px)' : 'none',
         borderBottom: scrolled ? '1px solid var(--line)' : '1px solid transparent',
       }}>
-        <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 0' }}>
+        <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 20, paddingBottom: 20 }}>
           <a href="#top" onClick={() => setMenuOpen(false)}><Logo size={32} /></a>
           <div className="nav-links" style={{ display: 'flex', alignItems: 'center', gap: 32, fontSize: 14, fontWeight: 500 }}>
             {LINKS.map(([l, h]) => (
