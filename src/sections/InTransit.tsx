@@ -20,14 +20,9 @@ export const InTransit = () => {
 
         <div
           className="in-transit-grid"
-          style={{
-            display: 'grid',
-            gridTemplateColumns: `repeat(${Math.min(state.inTransit.length, 4)}, 1fr)`,
-            gap: 0,
-          }}
+          style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 24 }}
         >
           {state.inTransit.slice(0, 4).map((it, i) => {
-            const count = Math.min(state.inTransit.length, 4);
             const statusIcon: IconName =
               it.status === 'ready' ? 'check' :
               it.status === 'customs' ? 'shield' :
@@ -38,18 +33,11 @@ export const InTransit = () => {
               'var(--cyan)';
             const statusFg = it.status === 'customs' ? 'var(--ink)' : '#fff';
             return (
-              <Reveal key={it.id} delay={i * 80}>
-                <div className="card" style={{
-                  background: '#0F0F0E',
-                  border: '1px solid var(--line)',
-                  borderRight: i < count - 1 ? 'none' : '1px solid var(--line)',
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                }}>
+              <Reveal key={it.id} delay={i * 60}>
+                <div className="card zoom-in" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ position: 'relative' }}>
-                    <CarPlaceholder label={`${it.brand} ${it.model}`} accent={it.accent} height={200} src={it.img} />
-                    <div style={{ position: 'absolute', top: 12, left: 12 }}>
+                    <CarPlaceholder label={`${it.brand} ${it.model}`} accent={it.accent} height={240} src={it.img} />
+                    <div style={{ position: 'absolute', top: 14, left: 14 }}>
                       <span className="tag" style={{
                         display: 'inline-flex', alignItems: 'center', gap: 6,
                         padding: '6px 10px',
@@ -60,22 +48,22 @@ export const InTransit = () => {
                         {it.statusLabel}
                       </span>
                     </div>
-                    <div style={{ position: 'absolute', top: 12, right: 12, padding: 6, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)' }}>
-                      <FlagFor country={it.country} size={18} />
+                    <div style={{ position: 'absolute', top: 14, right: 14, padding: 6, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)' }}>
+                      <FlagFor country={it.country} size={20} />
                     </div>
                   </div>
 
-                  <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
-                    <div className="num-marker" style={{ fontSize: 11 }}>
+                  <div style={{ padding: 24, display: 'flex', flexDirection: 'column', flex: 1 }}>
+                    <div className="num-marker" style={{ marginBottom: 10, fontSize: 11 }}>
                       {it.country === 'jp' ? 'Япония' : it.country === 'cn' ? 'Китай' : 'Корея'} · {it.statusLabel}
                     </div>
-                    <div className="h3" style={{ marginBottom: 0, color: '#fff', fontSize: 22, fontStyle: 'italic' }}>
+                    <div className="h3" style={{ marginBottom: 6, color: '#fff', fontSize: 24, fontStyle: 'italic' }}>
                       {it.brand} {it.model}
                     </div>
                     <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 12, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
                       <div>
                         <div className="num-marker" style={{ fontSize: 10 }}>под ключ</div>
-                        <div style={{ fontWeight: 900, fontStyle: 'italic', fontSize: 22, color: it.accent === 'coral' ? 'var(--coral)' : 'var(--cyan)', letterSpacing: '-0.02em' }}>
+                        <div style={{ fontWeight: 900, fontStyle: 'italic', fontSize: 26, color: it.accent === 'coral' ? 'var(--coral)' : 'var(--cyan)', letterSpacing: '-0.02em' }}>
                           {it.priceLandedRu}
                         </div>
                       </div>
@@ -91,11 +79,13 @@ export const InTransit = () => {
         </div>
       </div>
 
-      {/* Mobile: stack to single column (D-09 mobile guard) */}
+      {/* Resizing: 4-col → 2-col at narrow desktop, 1-col on mobile (matches Catalog's collapse via gridTemplateColumns string-match in global.css:555). */}
       <style>{`
+        @media (max-width: 1100px) and (min-width: 721px) {
+          #in-transit .in-transit-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        }
         @media (max-width: 720px) {
-          #in-transit .in-transit-grid { grid-template-columns: 1fr !important; }
-          #in-transit .in-transit-grid > div > div { border-right: 1px solid var(--line) !important; }
+          #in-transit .in-transit-grid { grid-template-columns: 1fr !important; gap: 24px !important; }
         }
       `}</style>
     </section>
