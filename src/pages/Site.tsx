@@ -23,8 +23,8 @@ export const Site = () => {
       <Hero onOpenQuiz={open} />
       <Marquee />
       <LeadMagnet onOpenQuiz={open} />
-      <Catalog onOpenQuiz={open} />
       <Process onOpenQuiz={open} />
+      <Catalog onOpenQuiz={open} />
       <Reviews />
       <CtaShipFromAnywhere onOpenQuiz={open} />
       <Faq />

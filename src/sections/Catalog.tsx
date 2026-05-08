@@ -25,7 +25,7 @@ export const Catalog = ({ onOpenQuiz }: { onOpenQuiz: () => void }) => {
         <Reveal>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 32, flexWrap: 'wrap', gap: 24 }}>
             <div>
-              <div className="num-marker" style={{ marginBottom: 14 }}>02 / Каталог</div>
+              <div className="num-marker" style={{ marginBottom: 14 }}>03 / Каталог</div>
               <h2 className="h1">Свежие машины<br /><span className="outline-italic">в&nbsp;пути</span> и&nbsp;в&nbsp;наличии</h2>
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

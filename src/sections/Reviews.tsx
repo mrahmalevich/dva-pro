@@ -15,7 +15,7 @@ export const Reviews = () => {
       <div className="container">
         <Reveal>
           <div style={{ marginBottom: 32 }}>
-            <div className="num-marker" style={{ marginBottom: 14 }}>05 / Отзывы</div>
+            <div className="num-marker" style={{ marginBottom: 14 }}>04 / Отзывы</div>
             <h2 className="h1">
               Отзывы наших клиентов.<br />
               <span className="outline-italic">Не&nbsp;по&nbsp;скрипту.</span>
@@ -51,8 +51,8 @@ export const Reviews = () => {
                   </div>
 
                   {/* Stars */}
-                  <div style={{ display: 'flex', gap: 2, marginBottom: 14, color: '#F5C518' }}>
-                    {Array.from({ length: r.rating }).map((_, k) => <Icon key={k} name="star" size={14} />)}
+                  <div style={{ display: 'flex', gap: 1, marginBottom: 14, color: '#FCB400' }}>
+                    {Array.from({ length: r.rating }).map((_, k) => <Icon key={k} name="star" size={11} />)}
                   </div>
 
                   {/* Body */}

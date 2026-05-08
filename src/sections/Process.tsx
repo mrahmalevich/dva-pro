@@ -25,7 +25,7 @@ export const Process = ({ onOpenQuiz }: { onOpenQuiz: () => void }) => {
       <div className="container">
         <Reveal>
           <div style={{ marginBottom: 32 }}>
-            <div className="num-marker" style={{ marginBottom: 14 }}>03 / Как мы работаем</div>
+            <div className="num-marker" style={{ marginBottom: 14 }}>02 / Как мы работаем</div>
             <h2 className="h1" style={{ maxWidth: 1000 }}>
               Четыре шага от&nbsp;заявки<br />до&nbsp;ключей. <span className="outline-italic">Без сюрпризов.</span>
             </h2>
