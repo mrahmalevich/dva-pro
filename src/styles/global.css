@@ -605,6 +605,18 @@ section { padding: 72px 0; position: relative; }
   header div[style*="repeat(4"] { grid-template-columns: 1fr 1fr !important; gap: 24px !important; }
   header div[style*="repeat(4"] > div { border-right: none !important; padding: 16px 0 !important; }
 
+  /* Hero body 2-col grid → stack to single column (the generic `section [style*=...]` rule
+     at line 555 doesn't fire because Hero is wrapped in <header>, not <section>). */
+  header div[style*="1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+    gap: 28px !important;
+    align-items: flex-start !important;
+  }
+
+  /* Tighten Hero pill row so 5 chips don't wrap into 3 cluttered lines. */
+  header div[style*="gap: 10"][style*="flexWrap"] { gap: 6px !important; margin-bottom: 20px !important; }
+  header div[style*="gap: 10"][style*="flexWrap"] > * { padding: 6px 10px !important; font-size: 11px !important; }
+
   #catalog button { padding: 8px 14px !important; font-size: 12px !important; }
 
   div[style*="repeat(5"] { grid-template-columns: 1fr !important; }
