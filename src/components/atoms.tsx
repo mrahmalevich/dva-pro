@@ -1,19 +1,11 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { Accent, Country } from '../crm/types';
 
-export const Logo = ({ size = 36 }: { size?: number }) => (
-  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
-    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden>
-      <rect width="64" height="64" fill="#fff" />
-      <g transform="skewX(-10) translate(4,0)">
-        <path d="M14 50 L24 14 L30 14 L24.5 33 L20 33 L18 40 L23 40 L21 50 Z" fill="#D57959" />
-        <path d="M34 14 L48 14 C53 14 56 17 56 22 C56 27 53 30 48 30 L42 30 L40 50 L34 50 Z M40 20 L40 25 L46 25 C48 25 49 24 49 22.5 C49 21 48 20 46 20 Z" fill="#1DA3CB" />
-      </g>
-    </svg>
-    <div className="logo-wordmark">
-      <span style={{ fontStyle: 'italic' }}>DVA</span>
-      <span className="pro" style={{ fontStyle: 'italic' }}>pro</span>
-    </div>
+export const Logo = ({ size: _size = 36 }: { size?: number }) => (
+  <div className="logo-wordmark" style={{ display: 'inline-flex', alignItems: 'baseline' }}>
+    <span style={{ fontStyle: 'italic' }}>DVA</span>
+    <span className="pro" style={{ fontStyle: 'italic' }}>pro</span>
+    <span style={{ color: 'var(--coral)', fontStyle: 'italic', marginLeft: 1 }}>.</span>
   </div>
 );
 
@@ -39,7 +31,7 @@ export const Icon = ({ name, size = 20, stroke = 1.6 }: { name: IconName; size?:
     case 'phone': return <svg viewBox="0 0 24 24" {...s}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92z" /></svg>;
     case 'mail': return <svg viewBox="0 0 24 24" {...s}><rect x="3" y="5" width="18" height="14" /><path d="M3 7l9 6 9-6" /></svg>;
     case 'tg': return <svg viewBox="0 0 24 24" fill="currentColor"><path d="M22 4L2 12l6 2 2 6 4-4 6 4 2-16zM10 14l8-7-10 6 2 1z" /></svg>;
-    case 'wa': return <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.5 15.2L2 22l4.9-1.4A10 10 0 1 0 12 2zm4.4 12.7c-.2-.1-1.4-.7-1.6-.8s-.4-.1-.5.1l-.7.9c-.1.2-.3.2-.5.1-.7-.3-1.6-.9-2.4-1.6-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.4.1-.5.1-.1.2-.3.4-.4.1-.1.2-.2.3-.4 0-.1 0-.3 0-.4 0-.1-.5-1.3-.7-1.7-.2-.5-.4-.4-.5-.4h-.5c-.2 0-.4.1-.6.3-.2.2-.8.8-.8 1.9 0 1.1.8 2.2.9 2.4.1.1 1.6 2.4 3.8 3.4.5.2 1 .4 1.3.5.5.2 1 .1 1.4.1.4-.1 1.4-.6 1.6-1.1.2-.5.2-1 .1-1.1z" /></svg>;
+    case 'wa': return <svg viewBox="0 0 32 32" fill="currentColor" fillRule="evenodd" clipRule="evenodd" width={size} height={size}><path d="M16.003 0C7.174 0 .008 7.162.005 15.97a15.91 15.91 0 0 0 2.136 7.984L0 32l8.236-2.158a16.002 16.002 0 0 0 7.76 1.974h.007c8.828 0 15.997-7.162 16-15.972C32.003 7.16 24.836 0 16.003 0zm9.327 22.815c-.397 1.114-2.305 2.131-3.221 2.268-.823.122-1.864.173-3.008-.189-.694-.219-1.583-.513-2.722-1.005-4.788-2.067-7.916-6.886-8.155-7.205-.239-.32-1.95-2.591-1.95-4.942s1.234-3.506 1.671-3.984c.437-.479.954-.598 1.273-.598l.916.017c.293.013.687-.111 1.075.82.398.957 1.353 3.307 1.473 3.547.119.24.198.519.039.838-.157.319-.238.518-.477.799-.239.279-.502.624-.717.838-.239.239-.488.498-.21.978.279.479 1.241 2.046 2.66 3.31 1.83 1.628 3.371 2.133 3.851 2.371.479.239.762.199 1.041-.119.279-.319 1.193-1.394 1.512-1.872.319-.479.638-.399 1.075-.24.437.16 2.787 1.314 3.265 1.553.477.24.794.358.913.557.121.197.121 1.155-.276 2.27z"/></svg>;
     case 'doc': return <svg viewBox="0 0 24 24" {...s}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></svg>;
     case 'shield': return <svg viewBox="0 0 24 24" {...s}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="M9 12l2 2 4-4" /></svg>;
     case 'truck': return <svg viewBox="0 0 24 24" {...s}><path d="M1 8h13v9H1zM14 11h5l3 4v2h-8z" /><circle cx="6" cy="18" r="2" /><circle cx="18" cy="18" r="2" /></svg>;
