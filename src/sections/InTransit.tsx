@@ -1,4 +1,4 @@
-import { CarPlaceholder, Chip, FlagFor, Icon, Reveal } from '../components/atoms';
+import { CarPlaceholder, FlagFor, Icon, Reveal } from '../components/atoms';
 import { useCrm } from '../crm/CrmProvider';
 import type { IconName } from '../components/atoms';
 
@@ -32,33 +32,57 @@ export const InTransit = () => {
               it.status === 'ready' ? 'check' :
               it.status === 'customs' ? 'shield' :
               'truck';
+            const statusBg =
+              it.status === 'ready' ? '#36D399' :
+              it.status === 'customs' ? 'rgba(255,255,255,0.92)' :
+              'var(--cyan)';
+            const statusFg = it.status === 'customs' ? 'var(--ink)' : '#fff';
             return (
               <Reveal key={it.id} delay={i * 80}>
-                <div style={{
+                <div className="card" style={{
                   background: '#0F0F0E',
                   border: '1px solid var(--line)',
                   borderRight: i < count - 1 ? 'none' : '1px solid var(--line)',
-                  padding: 24,
                   height: '100%',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: 16,
                 }}>
-                  <CarPlaceholder label={it.brand} accent={it.accent} height={180} />
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <Chip><FlagFor country={it.country} /> {it.country.toUpperCase()}</Chip>
-                    <Chip>
-                      <Icon name={statusIcon} size={12} />
-                      {it.statusLabel}
-                    </Chip>
+                  <div style={{ position: 'relative' }}>
+                    <CarPlaceholder label={`${it.brand} ${it.model}`} accent={it.accent} height={200} src={it.img} />
+                    <div style={{ position: 'absolute', top: 12, left: 12 }}>
+                      <span className="tag" style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                        padding: '6px 10px',
+                        background: statusBg, color: statusFg,
+                        fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+                      }}>
+                        <Icon name={statusIcon} size={12} />
+                        {it.statusLabel}
+                      </span>
+                    </div>
+                    <div style={{ position: 'absolute', top: 12, right: 12, padding: 6, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)' }}>
+                      <FlagFor country={it.country} size={18} />
+                    </div>
                   </div>
-                  <div>
-                    <div className="mono small" style={{ color: 'var(--mute-2)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>{it.brand}</div>
-                    <div className="h3" style={{ fontSize: 22 }}>{it.model}</div>
-                  </div>
-                  <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
-                    <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--coral)' }}>{it.priceLandedRu}</span>
-                    <span className="mono small" style={{ color: 'var(--mute-2)', letterSpacing: '0.08em' }}>{it.eta}</span>
+
+                  <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
+                    <div className="num-marker" style={{ fontSize: 11 }}>
+                      {it.country === 'jp' ? 'Япония' : it.country === 'cn' ? 'Китай' : 'Корея'} · {it.statusLabel}
+                    </div>
+                    <div className="h3" style={{ marginBottom: 0, color: '#fff', fontSize: 22, fontStyle: 'italic' }}>
+                      {it.brand} {it.model}
+                    </div>
+                    <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 12, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
+                      <div>
+                        <div className="num-marker" style={{ fontSize: 10 }}>под ключ</div>
+                        <div style={{ fontWeight: 900, fontStyle: 'italic', fontSize: 22, color: it.accent === 'coral' ? 'var(--coral)' : 'var(--cyan)', letterSpacing: '-0.02em' }}>
+                          {it.priceLandedRu}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right', fontSize: 12, color: 'var(--mute)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Icon name="truck" size={14} /> {it.eta}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </Reveal>

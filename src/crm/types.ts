@@ -93,6 +93,7 @@ export interface InTransitItem {
   eta: string;
   priceLandedRu: string;
   accent: Accent;
+  img: string;
 }
 
 export interface CrmState {

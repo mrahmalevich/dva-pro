@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { Car, CrmState, FaqItem, FeedItem, Lead, Review, SiteSettings, TimelineStep } from './types';
 import { SEED } from './seed';
 
-const STORAGE_KEY = 'dvapro:crm:v1';
+const STORAGE_KEY = 'dvapro:crm:v2';
 
 function loadInitialState(): CrmState {
   if (typeof window === 'undefined') return SEED;

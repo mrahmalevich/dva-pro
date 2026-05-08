@@ -24,7 +24,7 @@ export const SEED: CrmState = {
       accent: 'cyan',
       eta: 'На складе во Владивостоке',
       spec: '3.5T · 380 л.с. · AWD',
-      img: 'https://images.unsplash.com/photo-1669893642818-b2cd3987a08c?auto=format&fit=crop&w=1200&q=80',
+      img: 'https://images.unsplash.com/photo-1631295868223-63265b40d9e4?auto=format&fit=crop&w=1200&q=80',
     },
     {
       id: 'lc500',
@@ -48,7 +48,7 @@ export const SEED: CrmState = {
       accent: 'cyan',
       eta: 'В пути · Хоргос',
       spec: '1.5T + EV · 449 л.с.',
-      img: 'https://images.unsplash.com/photo-1669228069802-1cd428d3ad28?auto=format&fit=crop&w=1200&q=80',
+      img: 'https://images.unsplash.com/photo-1606016159991-dfe4f2746ad5?auto=format&fit=crop&w=1200&q=80',
     },
     {
       id: 'm5',
@@ -72,7 +72,7 @@ export const SEED: CrmState = {
       accent: 'cyan',
       eta: 'Прибытие 5 мая',
       spec: '3.0 R6 · 435 л.с.',
-      img: 'https://images.unsplash.com/photo-1622200294772-e411c2eb12c4?auto=format&fit=crop&w=1200&q=80',
+      img: 'https://images.unsplash.com/photo-1605559424843-9e4c228bf1c2?auto=format&fit=crop&w=1200&q=80',
     },
   ],
 
@@ -101,10 +101,10 @@ export const SEED: CrmState = {
   ],
 
   inTransit: [
-    { id: 'it-bmw-x5',       brand: 'BMW',          model: 'X5 xDrive40i', country: 'kr', status: 'in-transit', statusLabel: 'В пути',         eta: '14 дней',  priceLandedRu: '7 800 000 ₽',  accent: 'coral' },
-    { id: 'it-lexus-lx',     brand: 'Lexus',        model: 'LX 600',       country: 'jp', status: 'customs',    statusLabel: 'На таможне',     eta: '5 дней',   priceLandedRu: '12 400 000 ₽', accent: 'cyan'  },
-    { id: 'it-mercedes-g63', brand: 'Mercedes-AMG', model: 'G63',          country: 'kr', status: 'in-transit', statusLabel: 'В пути',         eta: '21 день',  priceLandedRu: '21 900 000 ₽', accent: 'coral' },
-    { id: 'it-genesis-gv80', brand: 'Genesis',      model: 'GV80 3.5T',    country: 'kr', status: 'ready',      statusLabel: 'Готов к выдаче', eta: 'на руках', priceLandedRu: '6 600 000 ₽',  accent: 'cyan'  },
+    { id: 'it-bmw-x5',       brand: 'BMW',          model: 'X5 xDrive40i', country: 'kr', status: 'in-transit', statusLabel: 'В пути',         eta: '14 дней',  priceLandedRu: '7 800 000 ₽',  accent: 'coral', img: 'https://images.unsplash.com/photo-1580273916550-e323be2ae537?auto=format&fit=crop&w=1200&q=80' },
+    { id: 'it-lexus-lx',     brand: 'Lexus',        model: 'LX 600',       country: 'jp', status: 'customs',    statusLabel: 'На таможне',     eta: '5 дней',   priceLandedRu: '12 400 000 ₽', accent: 'cyan',  img: 'https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?auto=format&fit=crop&w=1200&q=80' },
+    { id: 'it-mercedes-g63', brand: 'Mercedes-AMG', model: 'G63',          country: 'kr', status: 'in-transit', statusLabel: 'В пути',         eta: '21 день',  priceLandedRu: '21 900 000 ₽', accent: 'coral', img: 'https://images.unsplash.com/photo-1542362567-b07e54358753?auto=format&fit=crop&w=1200&q=80' },
+    { id: 'it-genesis-gv80', brand: 'Genesis',      model: 'GV80 3.5T',    country: 'kr', status: 'ready',      statusLabel: 'Готов к выдаче', eta: 'на руках', priceLandedRu: '6 600 000 ₽',  accent: 'cyan',  img: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1200&q=80' },
   ],
 
   feed: [
